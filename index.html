@@ -440,6 +440,57 @@ td .cat{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spac
 .howto li{font-size:13px;line-height:1.5}
 .howto p{font-size:12.5px;color:var(--muted);margin:12px 0 0}
 @media(max-width:700px){.sumtop{grid-template-columns:1fr}}
+
+/* app additions */
+[hidden]{display:none!important}
+.filein{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.drop{position:relative;display:block}
+.drop.has{border-style:solid;border-color:var(--good)}
+.drop .flist{font-size:11px;color:var(--good);margin-top:8px;font-weight:600;line-height:1.5}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:11px;padding:10px 16px;font-family:var(--font-body);font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;box-shadow:var(--shadow)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#211E19}
+.btn:hover{background:var(--surface-2)} .btn.pri:hover{filter:brightness(.97)}
+.empty{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:44px 24px;text-align:center}
+.empty .eic{font-size:34px}
+.empty h3{font-size:18px;font-weight:600;margin:10px 0 4px}
+.empty p{font-size:13.5px;color:var(--muted);margin:0 auto 18px;max-width:380px}
+.samptag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:7px;background:var(--accent-soft);color:var(--accent-deep);margin-left:8px;vertical-align:middle}
+.mvsub{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;margin:20px 0 6px}
+.sumgrid{display:grid;grid-template-columns:1fr 1.15fr;gap:16px;margin-bottom:20px;align-items:start}
+.sumcol{display:flex;flex-direction:column;gap:16px}
+.sumcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.sumcard h4{font-family:var(--font-head);font-size:12.5px;font-weight:600;text-align:center;padding:11px;border-bottom:1px solid var(--line);margin:0;background:var(--surface-2);letter-spacing:.02em}
+.sumrow{display:flex;justify-content:space-between;align-items:center;padding:7px 16px;font-size:12.5px}
+.sumrow.sep{border-top:1px solid var(--line);margin-top:4px;padding-top:11px}
+.sumrow:last-child{padding-bottom:12px}
+.sumrow .k{color:var(--muted)}
+.sumrow .v{font-family:var(--font-head);font-weight:600;font-variant-numeric:tabular-nums}
+.sumrow .v.neg{color:var(--crit)}
+.chartcard .cbody{padding:14px 16px 16px}
+.chartcard .legend{display:flex;gap:18px;justify-content:center;margin-top:8px;font-size:11.5px;color:var(--muted);font-weight:600}
+.chartcard .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+@media(max-width:760px){.sumgrid{grid-template-columns:1fr}}
+/* dropdown polish */
+.pop{min-width:170px}
+.pop button.on{background:var(--surface-2);color:var(--accent-deep);font-weight:700}
+.pop .ok,.pop .cnt{font-weight:600}
+/* segmented view switch */
+.segwrap{display:flex;justify-content:center;margin-bottom:18px}
+.seg{display:inline-flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px;box-shadow:var(--shadow);max-width:100%;overflow-x:auto}
+.seg button{flex:none;border:0;background:transparent;font-family:var(--font-body);font-size:13px;font-weight:600;color:var(--muted);padding:8px 16px;border-radius:999px;cursor:pointer;white-space:nowrap;transition:.15s}
+.seg button:hover{color:var(--ink)}
+.seg button.on{background:var(--card-dark);color:var(--card-dark-fg)}
+.sumone{max-width:480px;margin:0 auto}
+.sumone.wide{max-width:580px}
+.sumtop{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:860px;margin:0 auto 16px}
+.sumchart{max-width:600px;margin:0 auto}
+.howto{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:16px}
+.howto h4{font-family:var(--font-head);font-size:14px;font-weight:600;margin:0 0 10px}
+.howto ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:7px}
+.howto li{font-size:13px;line-height:1.5}
+.howto p{font-size:12.5px;color:var(--muted);margin:12px 0 0}
+@media(max-width:700px){.sumtop{grid-template-columns:1fr}}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -540,9 +591,9 @@ function ingestSales(R){let date='';for(const row of R.slice(0,8)){const j=(row|
   let outlet=null,item=null;const by={};for(const r of R){const c0=S(r[0]),c1=S(r[1]),c2=S(r[2]);const mo=c0.match(/^Outlet:\s*(\S+)-(.*)/);const mi=c1.match(/^Item:\s*([A-Z0-9]+)-(.*)/);if(mo){outlet=mo[2].trim();}else if(mi){item={p:mi[1],n:mi[2].trim()};}else if(c2==='Subtotal'&&item){const o=outlet;by[o]=by[o]||{pizzas:0,units:0,net:0};const q=num(r[8]);by[o].net+=num(r[5]);if(item.p.startsWith('ZA')){by[o].units+=q;if(/personal|regular|large/i.test(item.n))by[o].pizzas+=q;}item=null;}}
   for(const o in by){if(!date)continue;const key=norm(o)+'|'+date;const d=ensure(key,o,date);d.sales=by[o];}}
 
-async function handleFiles(list){let n=0;for(const f of list){try{if(/\.pdf$/i.test(f.name)){grnDocs.push(f.name);fileNames.grn.push(f.name);n++;continue;}const buf=await f.arrayBuffer();const wb=XLSX.read(new Uint8Array(buf),{type:'array'});const k=detect(wb);const R=rowsOf(wb);if(k==='stockcount'){ingestCount(R);fileNames.stockcount.push(f.name);}else if(k==='movement'){ingestMovement(R);fileNames.movement.push(f.name);}else if(k==='sales'){ingestSales(R);fileNames.sales.push(f.name);}else{continue;}n++;}catch(e){console.error('parse fail',f.name,e);}}
+async function handleFiles(list){let n=0,i=0;const total=list.length;for(const f of list){i++;const _st=document.getElementById('upStatus');if(_st)_st.textContent='Parsing '+i+' of '+total+': '+f.name+'\u2026';await new Promise(r=>setTimeout(r,0));try{if(/\.pdf$/i.test(f.name)){grnDocs.push(f.name);fileNames.grn.push(f.name);n++;continue;}const buf=await f.arrayBuffer();const wb=XLSX.read(new Uint8Array(buf),{type:'array',dense:true});const k=detect(wb);const R=rowsOf(wb);if(k==='stockcount'){ingestCount(R);fileNames.stockcount.push(f.name);}else if(k==='movement'){ingestMovement(R);fileNames.movement.push(f.name);}else if(k==='sales'){ingestSales(R);fileNames.sales.push(f.name);}else{continue;}n++;}catch(e){console.error('parse fail',f.name,e);}}
   if(!curKey()){const k=firstKeyWithItems();if(k){curO=DATA[k].ok;curD=DATA[k].date;}}
-  renderAll();if(sb)cloudSave(new Set(Object.keys(DATA)));return n;}
+  renderAll();if(sb){setCloud('loading');await cloudSave(new Set(Object.keys(DATA)));}return n;}
 
 function curKey(){return curO&&curD?curO+'|'+curD:null;}
 function cur(){const k=curKey();return k?DATA[k]:null;}
@@ -589,7 +640,7 @@ function sumSection(d){const m=money(d);const head=`<div class="sechead" style="
   <div class="sumchart"><div class="sumcard chartcard"><h4>Actual vs. Ideal Usage %</h4><div class="cbody">${barChart(m,wtd)}<div class="legend"><span><i style="background:var(--crit)"></i>Actual %</span><span><i style="background:var(--card-dark)"></i>Ideal %</span></div></div></div></div>`;}
 
 function setCloud(s){const el=document.getElementById('cloudPill');if(!el)return;const map={off:['local only','w'],synced:['cloud synced','g'],saved:['saved to cloud','g'],loading:['loading…','w'],error:['cloud error','c']};const m=map[s]||map.off;el.textContent=m[0];el.className='pill '+m[1];}
-async function cloudSave(keys){if(!sb)return;try{const rows=[...keys].map(k=>({id:k,outlet:DATA[k].outlet,outlet_key:DATA[k].ok,date:DATA[k].date,data:DATA[k]}));const {error}=await sb.from('datasets').upsert(rows);if(error)throw error;setCloud('saved');setTimeout(()=>setCloud('synced'),1500);}catch(e){console.error('cloudSave',e);setCloud('error');}}
+async function cloudSave(keys){if(!sb)return;const ks=[...keys].filter(k=>DATA[k]&&DATA[k].items&&DATA[k].items.length);if(!ks.length){setCloud('synced');return;}try{for(let i=0;i<ks.length;i+=20){const rows=ks.slice(i,i+20).map(k=>({id:k,outlet:DATA[k].outlet,outlet_key:DATA[k].ok,date:DATA[k].date,data:DATA[k]}));const {error}=await sb.from('datasets').upsert(rows);if(error)throw error;}setCloud('saved');setTimeout(()=>setCloud('synced'),1500);}catch(e){console.error('cloudSave',e);setCloud('error');}}
 async function cloudLoad(){if(!sb)return;try{setCloud('loading');const {data,error}=await sb.from('datasets').select('id,data');if(error)throw error;(data||[]).forEach(r=>{if(r.data)DATA[r.id]=r.data;});if(!curKey()){const k=firstKeyWithItems();if(k){curO=DATA[k].ok;curD=DATA[k].date;}}renderAll();setCloud('synced');}catch(e){console.error('cloudLoad',e);setCloud('error');}}
 function renderAll(){renderSelectors();renderOverview();renderVariance();renderDiscipline();renderOutlets();renderUpload();}
 
