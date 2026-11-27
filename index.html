@@ -534,6 +534,17 @@ td .cat{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spac
 .pweye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:0;padding:4px;margin:0;cursor:pointer;color:var(--muted);display:flex;align-items:center}
 .pweye:hover{color:var(--ink)}
 .pweye svg{width:19px;height:19px;display:block}
+.cfov{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(31,28,23,.45)}
+.cfbox{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.28);padding:26px 24px;max-width:380px;width:100%;text-align:center}
+.cfic{font-size:30px;line-height:1;margin-bottom:8px}
+.cftitle{font-family:var(--font-head);font-weight:700;font-size:17px;color:var(--ink);margin-bottom:7px}
+.cfmsg{font-size:13px;color:var(--muted);line-height:1.55;margin:0 0 20px}
+.cfbtns{display:flex;gap:10px}
+.cfbtn{flex:1;border-radius:11px;padding:11px;font-family:var(--font-body);font-size:13.5px;font-weight:700;cursor:pointer;border:1px solid var(--line)}
+.cfbtn.cancel{background:var(--surface-2);color:var(--ink)}
+.cfbtn.cancel:hover{background:var(--surface)}
+.cfbtn.danger{background:var(--crit);border-color:var(--crit);color:#fff}
+.cfbtn.danger:hover{filter:brightness(.94)}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -618,6 +629,14 @@ td .cat{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spac
 </div>
 <div class="scrim" id="scrim"></div>
 <aside class="side" id="side" aria-hidden="true"><button class="x" id="sx">&#10005;</button><div id="sbody"></div></aside>
+<div class="cfov" id="confirmOv" hidden>
+  <div class="cfbox">
+    <div class="cfic">&#9888;</div>
+    <div class="cftitle" id="confirmTitle">Are you sure?</div>
+    <p class="cfmsg" id="confirmMsg"></p>
+    <div class="cfbtns"><button class="cfbtn cancel" id="confirmNo">Cancel</button><button class="cfbtn danger" id="confirmOk">Delete</button></div>
+  </div>
+</div>
 
 <script>
 
@@ -816,7 +835,7 @@ document.body.addEventListener('click',e=>{const r=e.target.closest('[data-code]
 document.getElementById('sx').onclick=closeSide;document.getElementById('scrim').onclick=closeSide;
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSide();});
 document.querySelectorAll('.filein').forEach(inp=>inp.addEventListener('change',async e=>{const f=[...e.target.files];if(!f.length)return;document.getElementById('upStatus').textContent='Parsing '+f.length+' file(s)…';const n=await handleFiles(f);document.getElementById('upStatus').textContent=n+' file(s) added.';renderUpload();e.target.value='';}));
-document.getElementById('clearBtn').onclick=()=>{for(const k in DATA)delete DATA[k];grnDocs.length=0;for(const k in fileNames)fileNames[k].length=0;curO=curD=null;renderAll();if(sb)sb.from('datasets').delete().neq('id','__none__').then(()=>setCloud('synced'));};
+document.getElementById('clearBtn').onclick=async()=>{const ok=await confirmBox({title:'Clear everything?',msg:'This removes ALL data \u2014 every outlet and every day \u2014 for everyone. This cannot be undone.',ok:'Clear everything'});if(!ok)return;for(const k in DATA)delete DATA[k];grnDocs.length=0;for(const k in fileNames)fileNames[k].length=0;curO=curD=null;PENDING=[];PENDING_DEL=new Set();renderAll();renderApprovals();updateApBadge();if(sb)sb.from('datasets').delete().neq('id','__none__').then(()=>setCloud('synced'));};
 // outlet/date popovers
 const outBtn=document.getElementById('outBtn'),outPop=document.getElementById('outPop');
 outBtn.onclick=e=>{e.stopPropagation();outPop.hidden=!outPop.hidden;};
@@ -826,6 +845,13 @@ const dateIn=document.getElementById('dateIn');
 dateIn.onchange=()=>{const d=deiso(dateIn.value);if(curO&&DATA[curO+'|'+d]){curD=d;renderAll();}else{dateIn.value=curD?iso(curD):'';}};
 
 function fmtTs(iso){if(!iso)return '';const d=new Date(iso);if(isNaN(d))return '';const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return d.getDate()+' '+M[d.getMonth()]+' '+d.getFullYear()+', '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function confirmBox(opts){return new Promise(res=>{const ov=document.getElementById('confirmOv');if(!ov){res(true);return;}
+  document.getElementById('confirmTitle').textContent=opts.title||'Are you sure?';
+  document.getElementById('confirmMsg').textContent=opts.msg||'';
+  const ok=document.getElementById('confirmOk'),no=document.getElementById('confirmNo');
+  ok.textContent=opts.ok||'Delete';ov.hidden=false;
+  const done=v=>{ov.hidden=true;ok.onclick=null;no.onclick=null;ov.onclick=null;res(v);};
+  ok.onclick=()=>done(true);no.onclick=()=>done(false);ov.onclick=e=>{if(e.target===ov)done(false);};});}
 function renderDataList(){const el=document.getElementById('dataList');if(!el)return;
   const keys=Object.keys(DATA).filter(k=>DATA[k]&&DATA[k].items&&DATA[k].items.length).sort((a,b)=>{const A=DATA[a],B=DATA[b];return A.outlet===B.outlet?dnum(A.date)-dnum(B.date):(A.outlet<B.outlet?-1:1);});
   if(!keys.length){el.innerHTML='<p class="mut" style="padding:6px 2px">No data saved yet.</p>';return;}
@@ -842,7 +868,7 @@ async function adminDelete(k){try{if(sb){const {error}=await sb.from('datasets')
 async function rejectReq(id){try{if(sb)await sb.from('delete_requests').update({status:'rejected',resolved_by:ME&&ME.id,resolved_at:new Date().toISOString()}).eq('id',id);}catch(e){console.error('rejectReq',e);}await loadRequests();}
 function applyRole(){document.querySelectorAll('[data-role]').forEach(el=>{const r=el.getAttribute('data-role');el.hidden=(r==='admin')?(ROLE!=='admin'):(ROLE==='admin');});const rb=document.getElementById('roleBadge');if(rb){rb.textContent=ROLE==='admin'?'Admin':'Staff';rb.className='rolebadge '+(ROLE==='admin'?'adm':'usr');rb.hidden=false;}}
 document.body.addEventListener('click',async e=>{
-  const del=e.target.closest('[data-del]');if(del){e.preventDefault();if(ROLE!=='admin')return;del.disabled=true;await adminDelete(del.dataset.del);return;}
+  const del=e.target.closest('[data-del]');if(del){e.preventDefault();if(ROLE!=='admin')return;const dd=DATA[del.dataset.del];const ok=await confirmBox({title:'Delete this day?',msg:'Remove '+(dd?dd.outlet+' \u00b7 '+dd.date:'this day')+' for everyone. This cannot be undone.',ok:'Delete'});if(!ok)return;del.disabled=true;await adminDelete(del.dataset.del);return;}
   const req=e.target.closest('[data-req]');if(req){e.preventDefault();req.disabled=true;await requestDelete(req.dataset.req);return;}
   const ap=e.target.closest('[data-ap]');if(ap){e.preventDefault();ap.disabled=true;await adminDelete(ap.dataset.k);return;}
   const rej=e.target.closest('[data-rej]');if(rej){e.preventDefault();rej.disabled=true;await rejectReq(rej.dataset.rej);return;}
