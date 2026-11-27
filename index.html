@@ -683,7 +683,7 @@ function ingestSales(R){let date='';for(const row of R.slice(0,8)){const j=(row|
   for(const o in by){if(!date)continue;const key=norm(o)+'|'+date;const d=ensure(key,o,date);d.sales=by[o];}}
 
 async function handleFiles(list){TOUCHED=new Set();let n=0,i=0;const total=list.length;for(const f of list){i++;CURFILE=f.name;const _st=document.getElementById('upStatus');if(_st)_st.textContent='Parsing '+i+' of '+total+': '+f.name+'\u2026';await new Promise(r=>setTimeout(r,0));try{if(/\.pdf$/i.test(f.name)){grnDocs.push(f.name);fileNames.grn.push(f.name);try{const gb=await f.arrayBuffer();const g=await parseGrnPdf(gb);if(g.no&&g.items.length&&g.date){const gk=norm(g.storage)+'|'+g.date;const gd=ensure(gk,g.storage,g.date);gd.grns=gd.grns||[];if(!gd.grns.some(x=>x.no===g.no))gd.grns.push({no:g.no,items:g.items});}}catch(e){console.error('grn parse',f.name,e);}n++;continue;}const buf=await f.arrayBuffer();const wb=XLSX.read(new Uint8Array(buf),{type:'array',dense:true});const k=detect(wb);const R=rowsOf(wb);if(k==='stockcount'){ingestCount(R);fileNames.stockcount.push(f.name);}else if(k==='movement'){ingestMovement(R);fileNames.movement.push(f.name);}else if(k==='sales'){ingestSales(R);fileNames.sales.push(f.name);}else{continue;}n++;}catch(e){console.error('parse fail',f.name,e);}}
-  if(!curKey())pickDefault();
+  if(curO!=='__ALL__'&&!curKey())pickDefault();
   const _now=new Date().toISOString(),_who=meLabel();TOUCHED.forEach(k=>{if(DATA[k]){DATA[k].upAt=_now;if(_who)DATA[k].upBy=_who;}});renderAll();if(sb){setCloud('loading');await cloudSave(TOUCHED);}return n;}
 
 function curKey(){return curO&&curD?curO+'|'+curD:null;}
@@ -736,7 +736,7 @@ function sumSection(d){const m=money(d);const head=`<div class="sechead" style="
 
 function setCloud(s){const el=document.getElementById('cloudPill');if(!el)return;const map={off:['local only','w'],synced:['cloud synced','g'],saved:['saved to cloud','g'],loading:['loading…','w'],error:['cloud error','c']};const m=map[s]||map.off;el.textContent=m[0];el.className='pill '+m[1];}
 async function cloudSave(keys){if(!sb)return;const ks=[...keys].filter(k=>DATA[k]&&DATA[k].items&&DATA[k].items.length);if(!ks.length){setCloud('synced');return;}try{for(let i=0;i<ks.length;i+=20){const rows=ks.slice(i,i+20).map(k=>({id:k,outlet:DATA[k].outlet,outlet_key:DATA[k].ok,date:DATA[k].date,data:DATA[k]}));const {error}=await sb.from('datasets').upsert(rows);if(error)throw error;}setCloud('saved');setTimeout(()=>setCloud('synced'),1500);}catch(e){console.error('cloudSave',e);setCloud('error');}}
-async function cloudLoad(){if(!sb)return;try{setCloud('loading');const {data,error}=await sb.from('datasets').select('id,data');if(error)throw error;(data||[]).forEach(r=>{if(r.data)DATA[r.id]=r.data;});if(!curKey())pickDefault();renderAll();setCloud('synced');}catch(e){console.error('cloudLoad',e);setCloud('error');}}
+async function cloudLoad(){if(!sb)return;try{setCloud('loading');const {data,error}=await sb.from('datasets').select('id,data');if(error)throw error;(data||[]).forEach(r=>{if(r.data)DATA[r.id]=r.data;});if(curO!=='__ALL__'&&!curKey())pickDefault();renderAll();setCloud('synced');}catch(e){console.error('cloudLoad',e);setCloud('error');}}
 async function parseGrnPdf(buf){
   const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
   const allstr=[];const items=[];
@@ -769,15 +769,25 @@ function grnReconSection(d){
 function renderAll(){renderSelectors();renderOverview();renderVariance();renderDiscipline();renderOutlets();renderUpload();renderDataList();}
 
 function renderSelectors(){const os=outlets();const d=cur();
-  document.getElementById('outLbl').textContent=d?d.outlet:'—';
+  document.getElementById('outLbl').textContent=curO==='__ALL__'?'All outlets':(d?d.outlet:'—');
   const op=document.getElementById('outPop');const names=Object.keys(os);
-  op.innerHTML=names.length?names.map(ok=>`<button data-o="${ok}" class="${ok===curO?'on':''}">${os[ok].name} <span class="ok">${os[ok].dates.length}d</span></button>`).join(''):'<button class="dis" disabled>No outlets loaded</button>';
-  const di=document.getElementById('dateIn');const dts=curO?datesFor(curO):[];
-  if(di){di.value=curD?iso(curD):'';di.disabled=!dts.length;if(dts.length){di.min=iso(dts[0]);di.max=iso(dts[dts.length-1]);}}}
+  op.innerHTML=names.length?('<button data-o="__ALL__" class="'+(curO==='__ALL__'?'on':'')+'">All outlets <span class="ok">'+names.length+'</span></button>'+names.map(ok=>`<button data-o="${ok}" class="${ok===curO?'on':''}">${os[ok].name} <span class="ok">${os[ok].dates.length}d</span></button>`).join('')):'<button class="dis" disabled>No outlets loaded</button>';
+  const di=document.getElementById('dateIn');const _all=curO==='__ALL__';const dts=(curO&&!_all)?datesFor(curO):[];
+  if(di){di.style.display=_all?'none':'';di.value=(!_all&&curD)?iso(curD):'';di.disabled=_all||!dts.length;if(!_all&&dts.length){di.min=iso(dts[0]);di.max=iso(dts[dts.length-1]);}}}
 
 function emptyState(msg){return `<div class="empty"><div class="eic">&#128229;</div><h3>No data loaded</h3><p>${msg}</p><button class="btn pri" onclick="document.querySelector('#nav button[data-s=upload]').click()">Go to Upload</button></div>`;}
 
-function renderOverview(){const d=cur();const w=document.getElementById('ovWrap');if(!d){w.innerHTML=emptyState('Upload the daily Sales, Stock&nbsp;Count and Stock&nbsp;Movement Excel files on the Upload tab to begin.');return;}
+function renderAllOutlets(){const os=outlets();const keys=Object.keys(os);
+  if(!keys.length)return emptyState('Upload data for your outlets to see the group overview.');
+  let S=0,I=0,A=0;const rows=keys.map(ok=>{const dts=datesFor(ok);const last=dts[dts.length-1];const d=DATA[ok+'|'+last];const m=money(d);if(m.ok){S+=m.sales;I+=m.ideal;A+=m.actual;}return{name:os[ok].name,ok,date:last,days:dts.length,m};});
+  const V=A-I;const comb={sales:S,ideal:I,actual:A,variance:V,actPct:S?A/S*100:0,idealPct:S?I/S*100:0,varPct:S?V/S*100:0};
+  rows.sort((a,b)=>(b.m.ok?b.m.variance:-1e18)-(a.m.ok?a.m.variance:-1e18));
+  const head=`<div class="sechead"><h2>All outlets &mdash; group overview</h2><p class="mut">Each outlet's latest day, combined. Tap an outlet to open it.</p></div>`;
+  const combined=`<div class="sumtop" style="grid-template-columns:1fr;max-width:480px;margin:0 auto">${sumCard('Group total \u2014 all outlets',comb)}</div>`;
+  const trs=rows.map(r=>{const m=r.m;const vcol=m.ok?(m.variance>0?'var(--crit)':'var(--ink)'):'var(--muted)';return `<tr data-pick="${r.ok}" style="cursor:pointer"><td class="nm">${r.name}<div class="cat">${r.date||'\u2014'} &middot; ${r.days} day(s)</div></td><td class="tnum">${m.ok?RM(m.sales):'\u2014'}</td><td class="tnum" style="color:${vcol};font-weight:600">${m.ok?RM(m.variance):'\u2014'}</td><td class="tnum">${m.ok?m.actPct.toFixed(1)+'%':'\u2014'}</td><td class="tnum">${m.ok?m.idealPct.toFixed(1)+'%':'\u2014'}</td></tr>`;}).join('');
+  const table=`<div class="panel" style="margin-top:24px"><div class="ph"><h3>By outlet</h3><span class="mut">latest day &middot; tap to open</span></div><div class="tbl-wrap"><table><thead><tr><th>Outlet</th><th>Sales</th><th>Variance</th><th>Actual %</th><th>Ideal %</th></tr></thead><tbody>${trs}</tbody></table></div></div>`;
+  return head+combined+table;}
+function renderOverview(){const w=document.getElementById('ovWrap');if(curO==='__ALL__'){w.innerHTML=renderAllOutlets();return;}const d=cur();if(!d){w.innerHTML=emptyState('Upload the daily Sales, Stock&nbsp;Count and Stock&nbsp;Movement Excel files on the Upload tab to begin.');return;}
   const items=d.items;const tot=items.reduce((s,x)=>s+x.varrm,0);const food=items.filter(x=>x.cat==='FOOD').reduce((s,x)=>s+x.varrm,0);
   const big=items.slice().sort((a,b)=>a.varrm-b.varrm)[0];const flagged=items.filter(x=>Math.abs(x.varrm)>=10).length;const onT=items.length-flagged;
   const maxAbs=Math.max(...items.map(x=>Math.abs(x.varrm)),1);
@@ -844,7 +854,7 @@ document.getElementById('clearBtn').onclick=async()=>{const ok=await confirmBox(
 const outBtn=document.getElementById('outBtn'),outPop=document.getElementById('outPop');
 outBtn.onclick=e=>{e.stopPropagation();outPop.hidden=!outPop.hidden;};
 document.addEventListener('click',e=>{if(!outPop.contains(e.target)&&!outBtn.contains(e.target))outPop.hidden=true;});
-outPop.addEventListener('click',e=>{const b=e.target.closest('button[data-o]');if(!b)return;curO=b.dataset.o;const dts=datesFor(curO);if(!dts.includes(curD))curD=dts.slice(-1)[0];outPop.hidden=true;renderAll();});
+outPop.addEventListener('click',e=>{const b=e.target.closest('button[data-o]');if(!b)return;curO=b.dataset.o;if(curO!=='__ALL__'){const dts=datesFor(curO);if(!dts.includes(curD))curD=dts.slice(-1)[0];}outPop.hidden=true;renderAll();});
 const dateIn=document.getElementById('dateIn');
 dateIn.onchange=()=>{const d=deiso(dateIn.value);if(curO&&DATA[curO+'|'+d]){curD=d;renderAll();}else{dateIn.value=curD?iso(curD):'';}};
 
