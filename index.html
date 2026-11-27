@@ -548,6 +548,9 @@ td .cat{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spac
 .cfbtn.cancel:hover{background:var(--surface)}
 .cfbtn.danger{background:var(--crit);border-color:var(--crit);color:#fff}
 .cfbtn.danger:hover{filter:brightness(.94)}
+.charttip{position:fixed;z-index:300;background:var(--card-dark);color:var(--card-dark-fg);font-size:12px;font-weight:600;padding:7px 11px;border-radius:9px;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.28);white-space:nowrap}
+svg [data-tip]{cursor:pointer;transition:opacity .12s}
+svg [data-tip]:hover{opacity:.82}
 @media(max-width:700px){.kpis{grid-template-columns:repeat(2,1fr)}}
 .shell{display:flex;gap:18px;align-items:flex-start;margin-top:14px}
 .sidenav{flex:0 0 190px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);display:flex;flex-direction:column;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:10px}
@@ -684,6 +687,7 @@ td .cat{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spac
 </div>
 <div class="scrim" id="scrim"></div>
 <aside class="side" id="side" aria-hidden="true"><button class="x" id="sx">&#10005;</button><div id="sbody"></div></aside>
+<div class="charttip" id="chartTip" hidden></div>
 <div class="cfov" id="confirmOv" hidden>
   <div class="cfbox">
     <div class="cfic">&#9888;</div>
@@ -771,8 +775,8 @@ function barChart(today,wtd){
   const groups=[['Today',today],['Week-to-Date',wtd]],gw=pw/2,bw=54,gap=20;
   let bars='';
   groups.forEach((g,i)=>{const cx=pl+gw*i+gw/2,a=g[1].actPct,id=g[1].idealPct,xA=cx-bw-gap/2,xI=cx+gap/2;
-    bars+=`<rect x="${xA.toFixed(1)}" y="${y(a).toFixed(1)}" width="${bw}" height="${(pt+ph-y(a)).toFixed(1)}" rx="5" fill="var(--crit)"/>`;
-    bars+=`<rect x="${xI.toFixed(1)}" y="${y(id).toFixed(1)}" width="${bw}" height="${(pt+ph-y(id)).toFixed(1)}" rx="5" fill="var(--card-dark)"/>`;
+    bars+=`<rect x="${xA.toFixed(1)}" y="${y(a).toFixed(1)}" width="${bw}" height="${(pt+ph-y(a)).toFixed(1)}" rx="5" fill="var(--crit)" data-tip="${g[0]} \u00b7 Actual ${a.toFixed(1)}% \u00b7 ${RM(g[1].actual)}"/>`;
+    bars+=`<rect x="${xI.toFixed(1)}" y="${y(id).toFixed(1)}" width="${bw}" height="${(pt+ph-y(id)).toFixed(1)}" rx="5" fill="var(--card-dark)" data-tip="${g[0]} \u00b7 Ideal ${id.toFixed(1)}% \u00b7 ${RM(g[1].ideal)}"/>`;
     bars+=`<text x="${(xA+bw/2).toFixed(1)}" y="${(y(a)-8).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--crit)">${a.toFixed(0)}%</text>`;
     bars+=`<text x="${(xI+bw/2).toFixed(1)}" y="${(y(id)-8).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">${id.toFixed(0)}%</text>`;
     bars+=`<text x="${cx.toFixed(1)}" y="${H-16}" text-anchor="middle" font-size="12.5" font-weight="600" fill="var(--muted)">${g[0]}</text>`;});
@@ -954,6 +958,10 @@ document.getElementById('nav').addEventListener('click',e=>{
   document.querySelectorAll('.content > section').forEach(s=>s.hidden=s.id!==b.dataset.s);window.scrollTo({top:0,behavior:'smooth'});});
 document.body.addEventListener('click',e=>{const r=e.target.closest('[data-code]');if(r){openItem(r.dataset.code);return;}const p=e.target.closest('[data-pick]');if(p){curO=p.dataset.pick;curD=datesFor(curO).slice(-1)[0];renderAll();document.querySelector('#nav button[data-s=overview]').click();}});
 document.getElementById('sx').onclick=closeSide;document.getElementById('scrim').onclick=closeSide;
+(function(){const tip=document.getElementById('chartTip');if(!tip)return;
+  document.addEventListener('mouseover',e=>{const t=e.target.closest&&e.target.closest('[data-tip]');if(t){tip.textContent=t.getAttribute('data-tip');tip.hidden=false;}});
+  document.addEventListener('mousemove',e=>{if(!tip.hidden){let x=e.clientX+14,y=e.clientY+14;const w=tip.offsetWidth||140;if(x+w>window.innerWidth-8)x=e.clientX-w-14;tip.style.left=x+'px';tip.style.top=y+'px';}});
+  document.addEventListener('mouseout',e=>{const t=e.target.closest&&e.target.closest('[data-tip]');if(t)tip.hidden=true;});})();
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSide();});
 document.querySelectorAll('.filein').forEach(inp=>inp.addEventListener('change',async e=>{const f=[...e.target.files];if(!f.length)return;document.getElementById('upStatus').textContent='Parsing '+f.length+' file(s)…';const n=await handleFiles(f);document.getElementById('upStatus').textContent=n+' file(s) added.';renderUpload();e.target.value='';}));
 document.getElementById('clearBtn').onclick=async()=>{const ok=await confirmBox({title:'Clear everything?',msg:'This removes ALL data \u2014 every outlet and every day \u2014 for everyone. This cannot be undone.',ok:'Clear everything'});if(!ok)return;for(const k in DATA)delete DATA[k];grnDocs.length=0;for(const k in fileNames)fileNames[k].length=0;curO=curD=null;PENDING=[];PENDING_DEL=new Set();renderAll();renderApprovals();updateApBadge();if(sb)sb.from('datasets').delete().neq('id','__none__').then(()=>setCloud('synced'));};
