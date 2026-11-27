@@ -780,6 +780,7 @@ function renderOverview(){const d=cur();const w=document.getElementById('ovWrap'
   const list=items.filter(x=>Math.abs(x.varrm)>=10).sort((a,b)=>a.varrm-b.varrm).slice(0,7).map(it=>{const neg=it.varrm<0;const wd=Math.round(Math.abs(it.varrm)/maxAbs*100);return `<div class="vrow" data-code="${it.code}"><div class="nm"><b>${it.name}</b><span>${it.cat} &middot; ${it.varq} ${it.uom}</span><div class="bar"><i style="width:${wd}%;background:${neg?'var(--crit)':'var(--good)'}"></i></div></div><div class="amt ${neg?'neg':'pos'} tnum">${RM(it.varrm)}</div></div>`;}).join('')||'<div class="note" style="margin:8px">No item is off by more than RM10 &mdash; clean day.</div>';
   const src=[['Sales &mdash; POS (Zeoniq)',d.sales?`${d.sales.pizzas} pizzas &middot; ${d.sales.units} line items`:'not uploaded',!!d.sales],['Stock count',d.nCounts?`${d.nCounts} count(s)`:'not uploaded',!!d.nCounts],['Stock movement &mdash; Codemax',d.mv?`${Object.keys(d.mv).length} items`:'not uploaded',!!d.mv],['GRN &mdash; goods received',grnDocs.length?`${grnDocs.length} file(s)`:'not uploaded yet',grnDocs.length>0]];
   w.innerHTML=`<div class="sechead"><h2>Overview &mdash; ${d.outlet}, ${d.date}${d.sample?'<span class="samptag">sample</span>':''}</h2><p class="mut">Where the day's food cost drifted from recipe. Tap any item to see the full story.</p></div>
+  ${sumSection(d)}
   <div class="kpis">
     <div class="kpi lead"><div class="lab">Food variance (day)</div><div class="big ${tot<0?'neg':''} tnum">${RM(tot)}</div><div class="sub"><span class="pill ${tot<0?'c':'g'}">${tot<0?'▼ over recipe':'▲ under'}</span></div></div>
     <div class="kpi"><div class="lab">Food-only variance</div><div class="big ${food<0?'neg':''} tnum">${RM(food)}</div><div class="sub mut">packaging excluded</div></div>
@@ -789,8 +790,7 @@ function renderOverview(){const d=cur();const w=document.getElementById('ovWrap'
   <div class="cols">
     <div class="panel"><div class="ph"><h3>Biggest variances</h3><span class="mut">value at risk &rarr;</span></div><div class="pbody">${list}</div></div>
     <div class="panel"><div class="ph"><h3>Data for this day</h3></div><div class="pbody" style="padding:10px 14px">${src.map(s=>`<div class="vrow" style="cursor:default"><div class="nm"><b>${s[0]}</b><span>${s[1]}</span></div><span class="pill ${s[2]?'g':'w'}">${s[2]?'loaded':'—'}</span></div>`).join('')}</div></div>
-  </div>
-  ${sumSection(d)}`;}
+  </div>`;}
 
 function renderVariance(){const d=cur();const w=document.getElementById('varWrap');if(!d){w.innerHTML=emptyState('Upload the Stock&nbsp;Count file to see the full item-by-item variance.');return;}
   const items=d.items.slice().sort((a,b)=>a.varrm-b.varrm);const tot=items.reduce((s,x)=>s+x.varrm,0);const onT=items.filter(x=>Math.abs(x.varrm)<10).length;
