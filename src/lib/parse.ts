@@ -3,6 +3,8 @@ import type { Day, Item, Store } from './types';
 import { S, num, norm, clean, titl } from './calc';
 
 type Row = unknown[];
+// Keys that come from uploaded files must never reach Object.prototype.
+export const unsafe = (k: string) => k === '__proto__' || k === 'constructor' || k === 'prototype';
 const docNum = (d: string) => {
   const m = S(d).match(/(\d+)\s*$/);
   return m ? parseInt(m[1]) : 0;
@@ -32,12 +34,14 @@ export function timeOf(v: unknown): string {
 export const rowsOf = (wb: XLSX.WorkBook): Row[] =>
   XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null }) as Row[];
 
-export function detect(wb: XLSX.WorkBook): 'movement' | 'stockcount' | 'sales' | null {
+export function detect(wb: XLSX.WorkBook): 'movement' | 'stockcount' | 'sales' | 'apporders' | 'checklist' | null {
   const first = wb.SheetNames[0] || '';
   if (/MVMT|MOVEMENT/i.test(first)) return 'movement';
   const R = rowsOf(wb);
   for (const row of R.slice(0, 16)) {
     const j = (row || []).map(S).join(' ');
+    if (/Order ID/i.test(j) && /Grand Total/i.test(j) && /Outlet Name/i.test(j)) return 'apporders';
+    if (/Opening Checklist|Closing Checklist|MY OPS|Network:/i.test(j)) return 'checklist';
     if (/Movement Date/i.test(j)) return 'movement';
     if (/Document No\./i.test(j) || /Stock Count/i.test(j)) return 'stockcount';
     if (/Product Sales/i.test(j)) return 'sales';
@@ -71,6 +75,7 @@ export function ingestCount(store: Store, R: Row[]): string[] {
   const date = meta.date || '';
   const key = norm(meta.branch) + '|' + date;
   const d = ensure(store, key, meta.branch, date);
+  if (unsafe(meta.doc || '')) return [];
   d.counts[meta.doc || ''] = { doc: meta.doc || '', items };
   const sorted = Object.values(d.counts).sort((a, b) => docNum(a.doc) - docNum(b.doc));
   d.items = sorted[sorted.length - 1].items;
@@ -97,7 +102,7 @@ export function ingestMovement(store: Store, R: Row[]): string[] {
     m.in += qin;
     if (!m.cost) { const c = num(row[7]); if (c > 0) m.cost = c; }
     if (rem.startsWith('(POS ADJUSTMENT)')) m.outPos += qout;
-    else m.events.push({ t: timeOf(row[0]), in: qin, out: qout, r: rem });
+    else m.events.push({ t: timeOf(row[0]), in: qin, out: qout, r: rem, u: qin > 0 ? S(row[10]) : S(row[12]) });
   }
   return [...keys];
 }
@@ -111,7 +116,7 @@ export function ingestSales(store: Store, R: Row[]): string[] {
   }
   let outlet: string | null = null;
   let item: { p: string; n: string } | null = null;
-  const by: Record<string, { pizzas: number; units: number; net: number }> = {};
+  const by: Record<string, { pizzas: number; units: number; net: number }> = Object.create(null);
   for (const r of R) {
     const c0 = S(r[0]), c1 = S(r[1]), c2 = S(r[2]);
     const mo = c0.match(/^Outlet:\s*(\S+)-(.*)/);
@@ -120,6 +125,10 @@ export function ingestSales(store: Store, R: Row[]): string[] {
     else if (mi) item = { p: mi[1], n: mi[2].trim() };
     else if (c2 === 'Subtotal' && item) {
       const o = outlet as string;
+      if (unsafe(o)) {
+        item = null;
+        continue;
+      }
       by[o] = by[o] || { pizzas: 0, units: 0, net: 0 };
       const q = num(r[8]);
       by[o].net += num(r[5]);
@@ -131,7 +140,7 @@ export function ingestSales(store: Store, R: Row[]): string[] {
     }
   }
   const keys: string[] = [];
-  for (const o in by) {
+  for (const o of Object.keys(by)) {
     if (!date) continue;
     const key = norm(o) + '|' + date;
     ensure(store, key, o, date).sales = by[o];

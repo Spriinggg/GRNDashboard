@@ -1,4 +1,4 @@
-import type { Day, Money, Store, StatusCode, Item } from './types';
+import type { Day, GrnCheck, Money, Store, StatusCode, Item } from './types';
 
 export const num = (v: unknown): number => {
   if (v == null) return 0;
@@ -105,3 +105,33 @@ export const toIsoDate = (s: string) => {
   const m = S(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   return m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : "";
 };
+
+/* ---------- GRN cross-check ---------- */
+// Each GRN item is matched to the Stock Movement IN record carrying the same GRN number and item code.
+export function grnCheck(d?: Day | null): GrnCheck[] | null {
+  if (!d || !d.grns || !d.grns.length) return null;
+  const idx = new Map<string, { in: number; uom: string }>();
+  if (d.mv) {
+    for (const code of Object.keys(d.mv)) {
+      for (const e of d.mv[code].events) {
+        const m = String(e.r).match(/\((GRN\/\d+\/\d+)\)/);
+        if (m && e.in > 0) {
+          const k = m[1] + '|' + code;
+          const hit = idx.get(k) ?? { in: 0, uom: e.u || '' };
+          hit.in += e.in;
+          idx.set(k, hit);
+        }
+      }
+    }
+  }
+  return d.grns.map((g) => {
+    const items = g.items.map((it) => {
+      const hit = idx.get(g.no + '|' + it.code);
+      if (!hit) return { ...it, status: 'miss' as const };
+      const exact = hit.uom === it.uom && Math.abs(hit.in - it.qty) < 1e-6;
+      return { ...it, inq: +hit.in.toFixed(3), inuom: hit.uom, status: exact ? ('exact' as const) : ('diff' as const) };
+    });
+    const rec = items.filter((i) => i.status !== 'miss').length;
+    return { no: g.no, items, rec, total: items.length, miss: items.length - rec };
+  });
+}

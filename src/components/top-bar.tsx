@@ -9,12 +9,12 @@ import { UserMenu } from "@/components/user-menu";
 import { useData } from "@/components/data-provider";
 import { ScopeBar } from "@/components/page-header";
 
-const titles: Record<string, string> = { "/": "Dashboard", "/variance": "Food variance", "/discipline": "Count & GRN", "/outlets": "Outlets", "/upload": "Upload data" };
+const titles: Record<string, string> = { "/": "Dashboard", "/variance": "Food variance", "/discipline": "Count & GRN", "/outlets": "Outlets", "/upload": "Upload data", "/sales/by-outlet": "Sales by outlet", "/sales/by-channel": "Sales by channel", "/pnl": "Profit & loss", "/labor": "Labour vs sales", "/treeams": "Treeams", "/approvals": "Approvals" };
 
 export function TopBar() {
   const pathname = usePathname();
   const { cur, cloud } = useData();
-  const showScope = pathname === "/" || pathname.startsWith("/variance");
+  const showScope = pathname === "/" || ["/discipline"].some((p) => pathname.startsWith(p));
   const cloudText = { off: "Local only", synced: "Cloud synced", saved: "Saved to cloud", loading: "Loading", error: "Cloud error" }[cloud];
   const cloudDot = { off: "bg-muted-foreground", synced: "bg-success", saved: "bg-success", loading: "bg-primary", error: "bg-danger" }[cloud];
   const title = titles[pathname] ?? "US Pizza";

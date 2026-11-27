@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { useData } from "@/components/data-provider";
 import { DateRangeFilter } from "@/components/date-range-filter";
 import { FilterSelect } from "@/components/filter-select";
+import { GrnCrossCheck } from "@/components/grn-recon";
 import { CheckStatus } from "@/components/item-status";
 import { Kpis } from "@/components/kpi-strip";
 import { OutletMap } from "@/components/outlet-map";
@@ -212,6 +213,7 @@ export default function Discipline() {
         </div>
         <TablePagination view={view} noun="days" note="A missing count or GRN is where variance starts. Select a day with a count to open that outlet." />
       </Card>
+      <GrnCrossCheck />
     </>
   );
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import "./outlet-map.css";
+import { AuthProvider } from "@/components/auth-provider";
 import { AppSidebar } from "@/components/app-sidebar";
 import { DataProvider } from "@/components/data-provider";
 import { ItemSheet } from "@/components/item-sheet";
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning className={`${sans.variable} ${display.variable} h-full antialiased`}>
       <body className="min-h-full">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <AuthProvider>
           <DataProvider>
             <SidebarProvider>
               <AppSidebar />
@@ -35,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </SidebarProvider>
             <ItemSheet />
           </DataProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -2,6 +2,8 @@
 
 import { Upload as UploadIcon } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/components/auth-provider";
+import { DataList } from "@/components/data-list";
 import { useData } from "@/components/data-provider";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,8 @@ const ZONES: { kind: Kind; title: string; hint: string; accept: string }[] = [
   { kind: "stockcount", title: "Stock count, AM and PM", hint: "Stock Count Raw Materials, .xlsx", accept: ".xlsx,.xls" },
   { kind: "movement", title: "Stock movement, Codemax", hint: "Movement Details Raw Materials, .xlsx", accept: ".xlsx,.xls" },
   { kind: "grn", title: "GRN, goods received", hint: "Goods Received Note, .pdf", accept: ".pdf" },
+  { kind: "checklist", title: "Treeams, checklist", hint: "Checklist Reports, .xlsx", accept: ".xlsx,.xls" },
+  { kind: "channels", title: "Sales, app / channels", hint: "App order export, .xlsx or .csv", accept: ".csv,.xlsx,.xls" },
 ];
 const STEPS = [
   ["Sales, POS (Zeoniq)", "Product Sales Listing. Sets the ideal (recipe) usage."],
@@ -25,6 +29,7 @@ const STEPS = [
 
 export default function Upload() {
   const { store, fileNames, handleFiles, loadSample, clearAll, status } = useData();
+  const { isAdmin } = useAuth();
   const [over, setOver] = useState<Kind | null>(null);
   const nD = Object.keys(store).length;
   const nO = Object.keys(outletsOf(store)).length;
@@ -41,7 +46,7 @@ export default function Upload() {
       <Card className="gap-4 p-6 shadow-sm">
         <div>
           <h2 className="text-base font-semibold">What to upload</h2>
-          <p className="text-sm text-muted-foreground">All four, for the same outlet and date. Upload a week of files to build the history.</p>
+          <p className="text-sm text-muted-foreground">The first four, for the same outlet and date. Treeams and app orders are optional extras. Upload a week of files to build the history.</p>
         </div>
         <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((s, i) => (
@@ -58,7 +63,7 @@ export default function Upload() {
         </ol>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {ZONES.map((z) => {
           const has = fileNames[z.kind].length > 0;
           return (
@@ -113,10 +118,22 @@ export default function Upload() {
         <Button variant="outline" onClick={loadSample}>
           Load sample day (Ampang)
         </Button>
-        <Button variant="outline" onClick={clear}>
-          Clear all data
-        </Button>
+        {isAdmin ? (
+          <Button variant="outline" onClick={clear}>
+            Clear all data
+          </Button>
+        ) : null}
       </div>
+
+      <section aria-labelledby="saved-days" className="space-y-3">
+        <div>
+          <h2 id="saved-days" className="font-display text-xl font-bold">
+            Data for each day
+          </h2>
+          <p className="text-sm text-muted-foreground">{isAdmin ? "As an admin you can delete a day directly." : "Staff can request a delete; an admin approves before anything is removed."}</p>
+        </div>
+        <DataList />
+      </section>
     </>
   );
 }

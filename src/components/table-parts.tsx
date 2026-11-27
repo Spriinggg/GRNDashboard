@@ -11,12 +11,15 @@ import { cn } from "@/lib/utils";
 // back to the original order. `aria-sort` tells a screen reader which column is sorted.
 export function SortHead({
   label,
+  node,
   sortKey,
   sort,
   onSort,
   className,
 }: {
   label: string;
+  // Shown instead of the words when a logo says the same thing. `label` stays as the accessible name.
+  node?: React.ReactNode;
   sortKey: string;
   sort: SortState;
   onSort: (key: string) => void;
@@ -32,7 +35,7 @@ export function SortHead({
         aria-label={`Sort by ${label}`}
         className="-mx-1.5 inline-flex items-center gap-1 rounded px-1.5 py-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
       >
-        {label}
+        {node ?? label}
         {/* Always the full text colour (black in light mode), so the sort buttons are easy to see */}
         <Icon aria-hidden className="size-4 text-foreground" strokeWidth={dir ? 2.5 : 2} />
       </button>

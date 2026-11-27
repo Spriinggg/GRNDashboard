@@ -1,10 +1,11 @@
 "use client";
 
-import { ClipboardCheck, LayoutDashboard, MapPin, Scale, Upload } from "lucide-react";
+import { BadgeDollarSign, CheckSquare, ChevronRight, ClipboardCheck, Clock, LayoutDashboard, MapPin, Scale, ShieldCheck, ShoppingBag, Upload } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -16,31 +17,61 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useData } from "@/components/data-provider";
+import { useAuth } from "@/components/auth-provider";
 import { statusOf } from "@/lib/calc";
 
-type Item = { label: string; icon: LucideIcon; href: string; badge?: number };
+type Child = { label: string; href: string; icon?: LucideIcon };
+type Item = { label: string; icon: LucideIcon; href: string; badge?: number; children?: Child[] };
 type Group = { label?: string; items: Item[] };
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const [opened, setOpened] = useState<Record<string, boolean>>({});
   const { setOpenMobile } = useSidebar();
-  const { cur } = useData();
+  const { cur, requests } = useData();
+  const { isAdmin } = useAuth();
   const flagged = cur?.items ? cur.items.filter((i) => statusOf(i)[0] !== "good").length : 0;
   const groups: Group[] = [
     { items: [{ label: "Dashboard", icon: LayoutDashboard, href: "/" }] },
+    {
+      label: "Sales & P&L",
+      items: [
+        {
+          label: "Sales",
+          icon: ShoppingBag,
+          href: "/sales",
+          children: [
+            { label: "By outlet", href: "/sales/by-outlet" },
+            { label: "By channel", href: "/sales/by-channel" },
+          ],
+        },
+        { label: "Profit & loss", icon: BadgeDollarSign, href: "/pnl" },
+      ],
+    },
     {
       label: "Food control",
       items: [
         { label: "Food variance", icon: Scale, href: "/variance", badge: flagged || undefined },
         { label: "Count & GRN", icon: ClipboardCheck, href: "/discipline" },
+        { label: "Labour vs sales", icon: Clock, href: "/labor" },
       ],
     },
+    { label: "Operations", items: [{ label: "Treeams", icon: CheckSquare, href: "/treeams" }] },
     { label: "Network", items: [{ label: "Outlets", icon: MapPin, href: "/outlets" }] },
-    { label: "Data", items: [{ label: "Upload data", icon: Upload, href: "/upload" }] },
+    {
+      label: "Data",
+      items: [
+        { label: "Upload data", icon: Upload, href: "/upload" },
+        ...(isAdmin ? [{ label: "Approvals", icon: ShieldCheck, href: "/approvals", badge: requests.length || undefined }] : []),
+      ],
+    },
   ];
 
   return (
@@ -64,6 +95,33 @@ export function AppSidebar() {
                 {g.items.map((item) => {
                   const Icon = item.icon;
                   const current = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                  if (item.children) {
+                    const open = opened[item.label] ?? current;
+                    const sub = item.children;
+                    return (
+                      <SidebarMenuItem key={item.label}>
+                        <SidebarMenuButton isActive={current} tooltip={item.label} aria-expanded={open} onClick={() => setOpened((o) => ({ ...o, [item.label]: !open }))}>
+                          <Icon />
+                          <span>{item.label}</span>
+                          <ChevronRight aria-hidden className={`ml-auto transition-transform ${open ? "rotate-90" : ""}`} />
+                        </SidebarMenuButton>
+                        {open ? (
+                          <SidebarMenuSub>
+                            {sub.map((c) => {
+                              const on = c.href === item.href ? pathname === c.href : pathname.startsWith(c.href);
+                              return (
+                                <SidebarMenuSubItem key={c.href}>
+                                  <SidebarMenuSubButton isActive={on} aria-current={on ? "page" : undefined} render={<Link href={c.href} onClick={() => setOpenMobile(false)} />}>
+                                    <span>{c.label}</span>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              );
+                            })}
+                          </SidebarMenuSub>
+                        ) : null}
+                      </SidebarMenuItem>
+                    );
+                  }
                   return (
                     <SidebarMenuItem key={item.label}>
                       <SidebarMenuButton
