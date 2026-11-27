@@ -548,6 +548,8 @@ td .cat{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spac
 .cfbtn.cancel:hover{background:var(--surface)}
 .cfbtn.danger{background:var(--crit);border-color:var(--crit);color:#fff}
 .cfbtn.danger:hover{filter:brightness(.94)}
+#nav{flex-wrap:wrap}
+@media(max-width:700px){.kpis{grid-template-columns:repeat(2,1fr)}}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -589,13 +591,23 @@ td .cat{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spac
   </div>
   <nav id="nav">
     <button data-s="overview" aria-current="true">Overview</button>
+    <button data-s="sales">Sales</button>
     <button data-s="variance">Food Variance</button>
     <button data-s="discipline">Count &amp; GRN</button>
+    <button data-s="treeams">Treeams</button>
+    <button data-s="transfers">Transfers</button>
+    <button data-s="pnl">P&amp;L</button>
+    <button data-s="labor">Labour vs Sales</button>
     <button data-s="outlets">Outlets</button>
     <button data-s="upload">Upload data</button>
     <button data-s="approvals" data-role="admin" hidden>Approvals <span class="apbadge" id="apBadge" hidden></span></button>
   </nav>
   <section id="overview"><div id="ovWrap"></div></section>
+  <section id="sales" hidden><div id="salesWrap"></div></section>
+  <section id="treeams" hidden><div id="treeWrap"></div></section>
+  <section id="transfers" hidden><div id="transWrap"></div></section>
+  <section id="pnl" hidden><div id="pnlWrap"></div></section>
+  <section id="labor" hidden><div id="laborWrap"></div></section>
   <section id="variance" hidden><div id="varWrap"></div></section>
   <section id="discipline" hidden><div id="discWrap"></div></section>
   <section id="outlets" hidden><div id="outWrap"></div></section>
@@ -619,6 +631,7 @@ td .cat{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spac
       <label class="drop" data-dz="stockcount"><input type="file" class="filein" multiple accept=".xlsx,.xls" data-kind="stockcount"><div class="ic">&#128203;</div><b>Stock count &mdash; AM &amp; PM</b><span>Stock Count Raw Materials &middot; .xlsx</span><div class="flist" data-list="stockcount"></div></label>
       <label class="drop" data-dz="movement"><input type="file" class="filein" multiple accept=".xlsx,.xls" data-kind="movement"><div class="ic">&#128260;</div><b>Stock movement &mdash; Codemax</b><span>Movement Details Raw Materials &middot; .xlsx</span><div class="flist" data-list="movement"></div></label>
       <label class="drop" data-dz="grn"><input type="file" class="filein" multiple accept=".pdf" data-kind="grn"><div class="ic">&#128667;</div><b>GRN &mdash; goods received</b><span>Goods Received Note &middot; .pdf</span><div class="flist" data-list="grn"></div></label>
+      <label class="drop" data-dz="checklist"><input type="file" class="filein" multiple accept=".xlsx,.xls" data-kind="checklist"><div class="ic">&#9989;</div><b>Treeams &mdash; checklist</b><span>Checklist Reports &middot; .xlsx</span><div class="flist" data-list="checklist"></div></label>
     </div>
     <div class="note" id="upStatus">Nothing loaded yet. Everything is parsed in your browser and saved to your cloud &mdash; no file leaves your machine.</div>
     <div class="datamgr">
@@ -655,7 +668,7 @@ const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 let sb=null;try{if(SUPABASE_URL&&SUPABASE_ANON_KEY&&window.supabase){sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);}}catch(e){console.error('supabase init',e);}
 let ROLE='user',ME=null,PENDING=[],PENDING_DEL=new Set(),TOUCHED=new Set(),CURFILE=null;
 try{if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}catch(e){}
-const DATA={}; let curO=null, curD=null; const grnDocs=[]; const fileNames={sales:[],stockcount:[],movement:[],grn:[]};
+const DATA={}; let curO=null, curD=null; const grnDocs=[]; const CHECKLIST={}; const fileNames={sales:[],stockcount:[],movement:[],grn:[],checklist:[]};
 const num=v=>{if(v==null)return 0;if(typeof v==='number')return v;const n=parseFloat(String(v).replace(/,/g,''));return isNaN(n)?0:n;};
 const S=v=>v==null?'':String(v).trim();
 const norm=s=>S(s).toUpperCase().replace(/\[RM\]|US PIZZA|\(RM\)/g,'').replace(/[^A-Z0-9]/g,'');
@@ -668,7 +681,7 @@ function dateOf(v){if(v==null)return '';if(typeof v==='number'){const o=XLSX.SSF
 function timeOf(v){if(typeof v==='number'){const o=XLSX.SSF.parse_date_code(v);if(o){let h=o.H,ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+String(o.M).padStart(2,'0')+' '+ap;}}const p=S(v).split(' ');return p.slice(1).join(' ');}
 
 function rowsOf(wb){const ws=wb.Sheets[wb.SheetNames[0]];return XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});}
-function detect(wb){const first=(wb.SheetNames[0]||'');if(/MVMT|MOVEMENT/i.test(first))return 'movement';const R=rowsOf(wb);for(const row of R.slice(0,16)){const j=(row||[]).map(S).join(' ');if(/Movement Date/i.test(j))return 'movement';if(/Document No\./i.test(j)||/Stock Count/i.test(j))return 'stockcount';if(/Product Sales/i.test(j))return 'sales';}return null;}
+function detect(wb){const first=(wb.SheetNames[0]||'');if(/MVMT|MOVEMENT/i.test(first))return 'movement';const R=rowsOf(wb);for(const row of R.slice(0,16)){const j=(row||[]).map(S).join(' ');if(/Opening Checklist|Closing Checklist|MY OPS|Network:/i.test(j))return 'checklist';if(/Movement Date/i.test(j))return 'movement';if(/Document No\./i.test(j)||/Stock Count/i.test(j))return 'stockcount';if(/Product Sales/i.test(j))return 'sales';}return null;}
 function ensure(key,disp,date){if(!DATA[key])DATA[key]={ok:norm(disp),outlet:clean(disp),date:date,items:null,counts:{},sales:null,mv:null,sample:false};TOUCHED.add(key);if(CURFILE){const D=DATA[key];D.files=D.files||[];if(!D.files.includes(CURFILE))D.files.push(CURFILE);}return DATA[key];}
 
 function ingestCount(R){let meta={},hi=-1;for(let i=0;i<R.length;i++){const k=S(R[i][0]);if(k==='Document No.')meta.doc=S(R[i][1]);else if(k==='Document Date')meta.date=dateOf(R[i][1]);else if(k==='Branch Name')meta.branch=S(R[i][1]);else if(k==='No.'){hi=i;break;}}
@@ -682,9 +695,9 @@ function ingestSales(R){let date='';for(const row of R.slice(0,8)){const j=(row|
   let outlet=null,item=null;const by={};for(const r of R){const c0=S(r[0]),c1=S(r[1]),c2=S(r[2]);const mo=c0.match(/^Outlet:\s*(\S+)-(.*)/);const mi=c1.match(/^Item:\s*([A-Z0-9]+)-(.*)/);if(mo){outlet=mo[2].trim();}else if(mi){item={p:mi[1],n:mi[2].trim()};}else if(c2==='Subtotal'&&item){const o=outlet;by[o]=by[o]||{pizzas:0,units:0,net:0};const q=num(r[8]);by[o].net+=num(r[5]);if(item.p.startsWith('ZA')){by[o].units+=q;if(/personal|regular|large/i.test(item.n))by[o].pizzas+=q;}item=null;}}
   for(const o in by){if(!date)continue;const key=norm(o)+'|'+date;const d=ensure(key,o,date);d.sales=by[o];}}
 
-async function handleFiles(list){TOUCHED=new Set();let n=0,i=0;const total=list.length;for(const f of list){i++;CURFILE=f.name;const _st=document.getElementById('upStatus');if(_st)_st.textContent='Parsing '+i+' of '+total+': '+f.name+'\u2026';await new Promise(r=>setTimeout(r,0));try{if(/\.pdf$/i.test(f.name)){grnDocs.push(f.name);fileNames.grn.push(f.name);try{const gb=await f.arrayBuffer();const g=await parseGrnPdf(gb);if(g.no&&g.items.length&&g.date){const gk=norm(g.storage)+'|'+g.date;const gd=ensure(gk,g.storage,g.date);gd.grns=gd.grns||[];if(!gd.grns.some(x=>x.no===g.no))gd.grns.push({no:g.no,items:g.items});}}catch(e){console.error('grn parse',f.name,e);}n++;continue;}const buf=await f.arrayBuffer();const wb=XLSX.read(new Uint8Array(buf),{type:'array',dense:true});const k=detect(wb);const R=rowsOf(wb);if(k==='stockcount'){ingestCount(R);fileNames.stockcount.push(f.name);}else if(k==='movement'){ingestMovement(R);fileNames.movement.push(f.name);}else if(k==='sales'){ingestSales(R);fileNames.sales.push(f.name);}else{continue;}n++;}catch(e){console.error('parse fail',f.name,e);}}
+async function handleFiles(list){TOUCHED=new Set();let clNew=false;let n=0,i=0;const total=list.length;for(const f of list){i++;CURFILE=f.name;const _st=document.getElementById('upStatus');if(_st)_st.textContent='Parsing '+i+' of '+total+': '+f.name+'\u2026';await new Promise(r=>setTimeout(r,0));try{if(/\.pdf$/i.test(f.name)){grnDocs.push(f.name);fileNames.grn.push(f.name);try{const gb=await f.arrayBuffer();const g=await parseGrnPdf(gb);if(g.no&&g.items.length&&g.date){const gk=norm(g.storage)+'|'+g.date;const gd=ensure(gk,g.storage,g.date);gd.grns=gd.grns||[];if(!gd.grns.some(x=>x.no===g.no))gd.grns.push({no:g.no,items:g.items});}}catch(e){console.error('grn parse',f.name,e);}n++;continue;}const buf=await f.arrayBuffer();const wb=XLSX.read(new Uint8Array(buf),{type:'array',dense:true});const k=detect(wb);const R=rowsOf(wb);if(k==='stockcount'){ingestCount(R);fileNames.stockcount.push(f.name);}else if(k==='movement'){ingestMovement(R);fileNames.movement.push(f.name);}else if(k==='sales'){ingestSales(R);fileNames.sales.push(f.name);}else if(k==='checklist'){ingestChecklist(R);fileNames.checklist.push(f.name);clNew=true;}else{continue;}n++;}catch(e){console.error('parse fail',f.name,e);}}
   if(curO!=='__ALL__'&&!curKey())pickDefault();
-  const _now=new Date().toISOString(),_who=meLabel();TOUCHED.forEach(k=>{if(DATA[k]){DATA[k].upAt=_now;if(_who)DATA[k].upBy=_who;}});renderAll();if(sb){setCloud('loading');await cloudSave(TOUCHED);}return n;}
+  const _now=new Date().toISOString(),_who=meLabel();TOUCHED.forEach(k=>{if(DATA[k]){DATA[k].upAt=_now;if(_who)DATA[k].upBy=_who;}});renderAll();if(sb){setCloud('loading');await cloudSave(TOUCHED);if(clNew)await saveChecklist();}return n;}
 
 function curKey(){return curO&&curD?curO+'|'+curD:null;}
 function cur(){const k=curKey();return k?DATA[k]:null;}
@@ -736,7 +749,7 @@ function sumSection(d){const m=money(d);const head=`<div class="sechead" style="
 
 function setCloud(s){const el=document.getElementById('cloudPill');if(!el)return;const map={off:['local only','w'],synced:['cloud synced','g'],saved:['saved to cloud','g'],loading:['loading…','w'],error:['cloud error','c']};const m=map[s]||map.off;el.textContent=m[0];el.className='pill '+m[1];}
 async function cloudSave(keys){if(!sb)return;const ks=[...keys].filter(k=>DATA[k]&&DATA[k].items&&DATA[k].items.length);if(!ks.length){setCloud('synced');return;}try{for(let i=0;i<ks.length;i+=20){const rows=ks.slice(i,i+20).map(k=>({id:k,outlet:DATA[k].outlet,outlet_key:DATA[k].ok,date:DATA[k].date,data:DATA[k]}));const {error}=await sb.from('datasets').upsert(rows);if(error)throw error;}setCloud('saved');setTimeout(()=>setCloud('synced'),1500);}catch(e){console.error('cloudSave',e);setCloud('error');}}
-async function cloudLoad(){if(!sb)return;try{setCloud('loading');const {data,error}=await sb.from('datasets').select('id,data');if(error)throw error;(data||[]).forEach(r=>{if(r.data)DATA[r.id]=r.data;});if(curO!=='__ALL__'&&!curKey())pickDefault();renderAll();setCloud('synced');}catch(e){console.error('cloudLoad',e);setCloud('error');}}
+async function cloudLoad(){if(!sb)return;try{setCloud('loading');const {data,error}=await sb.from('datasets').select('id,data');if(error)throw error;(data||[]).forEach(r=>{if(r.id==='__TREEAMS__'){if(r.data&&r.data.__cl)Object.assign(CHECKLIST,r.data.__cl);}else if(r.data)DATA[r.id]=r.data;});if(curO!=='__ALL__'&&!curKey())pickDefault();renderAll();setCloud('synced');}catch(e){console.error('cloudLoad',e);setCloud('error');}}
 async function parseGrnPdf(buf){
   const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
   const allstr=[];const items=[];
@@ -766,7 +779,56 @@ function grnReconSection(d){
   return checks.map(g=>{const rows=g.items.map(it=>{const st=it.status==='miss'?['crit','NOT recorded']:it.status==='exact'?['good','recorded']:['good','recorded (converted)'];const sys=it.status==='miss'?'—':(it.inq+' '+it.inuom);return `<tr><td class="nm">${it.code}<div class="cat">${(it.desc||'').slice(0,36)}</div></td><td class="tnum">${it.qty} ${it.uom}</td><td class="tnum">${sys}</td><td><span class="badge" style="background:var(--${st[0]}-bg);color:var(--${st[0]})">${st[1]}</span></td></tr>`;}).join('');
     return `<div class="panel" style="margin-bottom:16px"><div class="ph"><h3>GRN ${g.no}</h3><span class="pill ${g.miss?'c':'g'}">${g.rec}/${g.total} recorded${g.miss?' · '+g.miss+' missing':''}</span></div><div class="tbl-wrap"><table><thead><tr><th>Item</th><th>GRN qty</th><th>System IN</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;}).join('');
 }
-function renderAll(){renderSelectors();renderOverview();renderVariance();renderDiscipline();renderOutlets();renderUpload();renderDataList();}
+const clShort=n=>/opening/i.test(n)?'Opening':/closing/i.test(n)?'Closing':/cash/i.test(n)?'Cash':/manager|objective|hourly/i.test(n)?'Manager':S(n).replace(/^MY OPS - /i,'').slice(0,14);
+function ingestChecklist(R){let o=null,cols=[];for(const row of R){if(!row)continue;const a=S(row[0]);const nm=a.match(/^Network:\s*(.+)/);
+  if(nm){o=nm[1].trim();cols=[];for(let c=1;c<row.length;c++){if(S(row[c]))cols.push(c);}continue;}
+  if(o&&a&&!/^Network:/.test(a)){const s=clShort(a);const ob=(CHECKLIST[o]=CHECKLIST[o]||{});const e=(ob[s]=ob[s]||{done:0,exp:0});
+    for(const c of cols){const comp=num(row[c]),exp=num(row[c+3]);if(exp>0){e.exp++;if(comp>0)e.done++;}}}}}
+async function saveChecklist(){if(!sb)return;try{await sb.from('datasets').upsert({id:'__TREEAMS__',outlet:'Treeams',outlet_key:'__sys',date:'',data:{__cl:CHECKLIST}});}catch(e){console.error('saveChecklist',e);}}
+function renderTreeams(){const w=document.getElementById('treeWrap');const head=`<div class="sechead"><h2>Treeams &mdash; checklist compliance</h2><p class="mut">Did each outlet complete its daily operational checklists? Higher is better.</p></div>`;
+  const outs=Object.keys(CHECKLIST);
+  if(!outs.length){w.innerHTML=head+emptyState('Upload the Treeams checklist report (.xlsx) on the Upload tab.');return;}
+  const PREF=['Opening','Closing','Manager','Cash'];const types=[];outs.forEach(o=>Object.keys(CHECKLIST[o]).forEach(t=>{if(!types.includes(t))types.push(t);}));
+  types.sort((a,b)=>{const ia=PREF.indexOf(a),ib=PREF.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib);});
+  let gd=0,ge=0;const rows=outs.map(o=>{let d=0,e=0;const per={};types.forEach(t=>{const x=CHECKLIST[o][t];per[t]=x&&x.exp?x.done/x.exp*100:(x?0:null);if(x){d+=x.done;e+=x.exp;}});gd+=d;ge+=e;return{o,per,overall:e?d/e*100:0};});
+  rows.sort((a,b)=>a.overall-b.overall);const overall=ge?gd/ge*100:0;
+  const best=rows.slice().sort((a,b)=>b.overall-a.overall)[0],worst=rows[0];
+  const pct=v=>v==null?'&mdash;':Math.round(v)+'%';const col=v=>v==null?'var(--muted)':v>=80?'var(--good)':v>=50?'#C98A00':'var(--crit)';
+  const kpis=`<div class="kpis"><div class="kpi lead"><div class="lab">Overall compliance</div><div class="big tnum">${Math.round(overall)}%</div><div class="sub mut">${gd} of ${ge} done</div></div><div class="kpi"><div class="lab">Outlets tracked</div><div class="big tnum">${outs.length}</div><div class="sub mut">from Treeams</div></div><div class="kpi"><div class="lab">Best</div><div class="big tnum" style="font-size:19px">${best.o}</div><div class="sub"><span class="pill g">${Math.round(best.overall)}%</span></div></div><div class="kpi"><div class="lab">Needs attention</div><div class="big tnum" style="font-size:19px">${worst.o}</div><div class="sub"><span class="pill c">${Math.round(worst.overall)}%</span></div></div></div>`;
+  const ths=types.map(t=>`<th>${t}</th>`).join('');
+  const trs=rows.map(r=>`<tr><td class="nm">${r.o}</td>${types.map(t=>`<td class="tnum" style="color:${col(r.per[t])};font-weight:600">${pct(r.per[t])}</td>`).join('')}<td class="tnum" style="color:${col(r.overall)};font-weight:700">${Math.round(r.overall)}%</td></tr>`).join('');
+  const table=`<div class="panel" style="margin-top:22px"><div class="ph"><h3>By outlet</h3><span class="mut">lowest compliance first</span></div><div class="tbl-wrap"><table><thead><tr><th>Outlet</th>${ths}<th>Overall</th></tr></thead><tbody>${trs}</tbody></table></div></div>`;
+  w.innerHTML=head+kpis+table;}
+function renderSales(){const w=document.getElementById('salesWrap');const d=cur();
+  const head=`<div class="sechead"><h2>Sales by channel${d?` &mdash; ${d.outlet}, ${d.date}`:''}</h2><p class="mut">Where the day's sales came from &mdash; delivery platforms, the US Pizza app and walk-in.</p></div>`;
+  if(!d){w.innerHTML=head+emptyState('Upload the Sales (POS) file to see sales.');return;}
+  const total=d.sales?(d.sales.net||0):null;const cv=d.channels||{};
+  const chans=[['ShopeeFood','shopee'],['GrabFood','grab'],['FoodPanda','panda'],['US Pizza App','app'],['Walk-in','walkin']];
+  const lead=`<div class="kpis"><div class="kpi lead"><div class="lab">Total net sales</div><div class="big tnum">${total!=null?RM(total):'&mdash;'}</div><div class="sub mut">from POS</div></div></div>`;
+  const cards=chans.map(c=>{const v=cv[c[1]];return `<div class="kpi"><div class="lab">${c[0]}</div><div class="big tnum">${v!=null?RM(v):'&mdash;'}</div><div class="sub mut">${v!=null&&total?Math.round(v/total*100)+'% of sales':'awaiting report'}</div></div>`;}).join('');
+  const grid=`<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:14px">${cards}</div>`;
+  const note=`<div class="note" style="margin-top:14px">Channel split needs the POS <b>Sales by Order Type / Channel</b> report. Upload it and these fill in automatically.</div>`;
+  w.innerHTML=head+lead+grid+note;}
+function renderPnl(){const w=document.getElementById('pnlWrap');const d=cur();
+  const head=`<div class="sechead"><h2>Profit &amp; Loss${d?` &mdash; ${d.outlet}, ${d.date}`:''}</h2><p class="mut">Daily P&amp;L. Sales and food cost are live; labour and overheads fill in when their reports are added.</p></div>`;
+  if(!d){w.innerHTML=head+emptyState('Upload the Sales, Stock Count and Stock Movement files to build the P&L.');return;}
+  const m=money(d);const sales=m.ok?m.sales:(d.sales?d.sales.net:0);const food=m.ok?m.actual:null;
+  const rows=[['Royalty Sales',sales!=null?RM2(sales):'&mdash;',''],['Food cost (actual)',food!=null?RM2(food):'&mdash;','neg'],['Gross profit after food',(sales!=null&&food!=null)?RM2(sales-food):'&mdash;','sep'],['Labour cost','&mdash;','mut'],['Rent &amp; utilities','&mdash;','mut'],['Other overheads','&mdash;','mut'],['Net profit','&mdash;','mut sep']];
+  const card=`<div class="sumtop" style="grid-template-columns:1fr;max-width:460px"><div class="sumcard"><h4>Daily P&amp;L</h4>${rows.map(r=>`<div class="sumrow ${/sep/.test(r[2])?'sep':''}"><span class="k">${r[0]}</span><span class="v ${/neg/.test(r[2])?'neg':''}">${r[1]}</span></div>`).join('')}</div></div>`;
+  const note=`<div class="note" style="margin-top:14px">Labour, rent and overheads need the payroll &amp; expense reports. Layout is ready &mdash; numbers fill in once those are uploaded.</div>`;
+  w.innerHTML=head+card+note;}
+function renderLabor(){const w=document.getElementById('laborWrap');const d=cur();
+  const head=`<div class="sechead"><h2>Labour cost vs Sales${d?` &mdash; ${d.outlet}, ${d.date}`:''}</h2><p class="mut">How much of sales goes to labour.</p></div>`;
+  const sales=d&&d.sales?(d.sales.net||0):null;
+  const kpis=`<div class="kpis"><div class="kpi lead"><div class="lab">Net sales</div><div class="big tnum">${sales!=null?RM(sales):'&mdash;'}</div><div class="sub mut">${d?'from POS':'no data'}</div></div><div class="kpi"><div class="lab">Labour cost</div><div class="big tnum">&mdash;</div><div class="sub mut">awaiting payroll</div></div><div class="kpi"><div class="lab">Labour % of sales</div><div class="big tnum">&mdash;</div><div class="sub mut">target &lt; 25%</div></div><div class="kpi"><div class="lab">Sales per labour RM</div><div class="big tnum">&mdash;</div><div class="sub mut">efficiency</div></div></div>`;
+  const note=`<div class="note" style="margin-top:14px">Upload the labour / payroll report (staff hours &amp; wages) to compute labour % and efficiency.</div>`;
+  w.innerHTML=head+kpis+note;}
+function renderTransfers(){const w=document.getElementById('transWrap');const d=cur();
+  const head=`<div class="sechead"><h2>Stock transfers${d?` &mdash; ${d.outlet}, ${d.date}`:''}</h2><p class="mut">Stock moved in from the Central Kitchen or between outlets.</p></div>`;
+  const table=`<div class="panel"><div class="ph"><h3>Transfers in / out</h3><span class="mut">from the transfer report</span></div><div class="tbl-wrap"><table><thead><tr><th>Item</th><th>From</th><th>To</th><th>Qty</th><th>Value</th></tr></thead><tbody><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:22px">No transfer report uploaded yet</td></tr></tbody></table></div></div>`;
+  const note=`<div class="note" style="margin-top:14px">Needs the Codemax <b>Cost Transferred By Branch</b> report. Upload it and transfers appear here.</div>`;
+  w.innerHTML=head+table+note;}
+function renderAll(){renderSelectors();renderOverview();renderSales();renderVariance();renderDiscipline();renderTreeams();renderTransfers();renderPnl();renderLabor();renderOutlets();renderUpload();renderDataList();}
 
 function renderSelectors(){const os=outlets();const d=cur();
   document.getElementById('outLbl').textContent=curO==='__ALL__'?'All outlets':(d?d.outlet:'—');
