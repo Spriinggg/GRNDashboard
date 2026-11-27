@@ -557,6 +557,7 @@ td .cat{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spac
     <div class="gtitle">US Pizza &middot; Food Control</div>
     <p class="gsub" id="gateSub">Sign in to view the dashboard</p>
     <form id="authForm" autocomplete="on">
+      <label class="gfield" id="nameField" hidden>Name<input type="text" id="authName" autocomplete="name" placeholder="e.g. Amirul Afiq"></label>
       <label class="gfield">Email<input type="email" id="authEmail" required autocomplete="email" placeholder="you@uspizza.com"></label>
       <label class="gfield">Password<span class="pwrap"><input type="password" id="authPass" required minlength="6" autocomplete="current-password" placeholder="At least 6 characters"><button type="button" class="pweye" id="pwEye" aria-label="Show password"></button></span></label>
       <div class="gerr" id="authErr" hidden></div>
@@ -680,7 +681,7 @@ function ingestSales(R){let date='';for(const row of R.slice(0,8)){const j=(row|
 
 async function handleFiles(list){TOUCHED=new Set();let n=0,i=0;const total=list.length;for(const f of list){i++;const _st=document.getElementById('upStatus');if(_st)_st.textContent='Parsing '+i+' of '+total+': '+f.name+'\u2026';await new Promise(r=>setTimeout(r,0));try{if(/\.pdf$/i.test(f.name)){grnDocs.push(f.name);fileNames.grn.push(f.name);try{const gb=await f.arrayBuffer();const g=await parseGrnPdf(gb);if(g.no&&g.items.length&&g.date){const gk=norm(g.storage)+'|'+g.date;const gd=ensure(gk,g.storage,g.date);gd.grns=gd.grns||[];if(!gd.grns.some(x=>x.no===g.no))gd.grns.push({no:g.no,items:g.items});}}catch(e){console.error('grn parse',f.name,e);}n++;continue;}const buf=await f.arrayBuffer();const wb=XLSX.read(new Uint8Array(buf),{type:'array',dense:true});const k=detect(wb);const R=rowsOf(wb);if(k==='stockcount'){ingestCount(R);fileNames.stockcount.push(f.name);}else if(k==='movement'){ingestMovement(R);fileNames.movement.push(f.name);}else if(k==='sales'){ingestSales(R);fileNames.sales.push(f.name);}else{continue;}n++;}catch(e){console.error('parse fail',f.name,e);}}
   if(!curKey())pickDefault();
-  const _now=new Date().toISOString(),_who=ME&&ME.email;TOUCHED.forEach(k=>{if(DATA[k]){DATA[k].upAt=_now;if(_who)DATA[k].upBy=_who;}});renderAll();if(sb){setCloud('loading');await cloudSave(TOUCHED);}return n;}
+  const _now=new Date().toISOString(),_who=meLabel();TOUCHED.forEach(k=>{if(DATA[k]){DATA[k].upAt=_now;if(_who)DATA[k].upBy=_who;}});renderAll();if(sb){setCloud('loading');await cloudSave(TOUCHED);}return n;}
 
 function curKey(){return curO&&curD?curO+'|'+curD:null;}
 function cur(){const k=curKey();return k?DATA[k]:null;}
@@ -781,7 +782,7 @@ function renderOverview(){const d=cur();const w=document.getElementById('ovWrap'
   const src=[['Sales &mdash; POS (Zeoniq)',d.sales?`${d.sales.pizzas} pizzas &middot; ${d.sales.units} line items`:'not uploaded',!!d.sales],['Stock count',d.nCounts?`${d.nCounts} count(s)`:'not uploaded',!!d.nCounts],['Stock movement &mdash; Codemax',d.mv?`${Object.keys(d.mv).length} items`:'not uploaded',!!d.mv],['GRN &mdash; goods received',grnDocs.length?`${grnDocs.length} file(s)`:'not uploaded yet',grnDocs.length>0]];
   w.innerHTML=`<div class="sechead"><h2>Overview &mdash; ${d.outlet}, ${d.date}${d.sample?'<span class="samptag">sample</span>':''}</h2><p class="mut">Where the day's food cost drifted from recipe. Tap any item to see the full story.</p></div>
   ${sumSection(d)}
-  <div class="kpis">
+  <div class="kpis" style="margin-top:30px">
     <div class="kpi lead"><div class="lab">Food variance (day)</div><div class="big ${tot<0?'neg':''} tnum">${RM(tot)}</div><div class="sub"><span class="pill ${tot<0?'c':'g'}">${tot<0?'▼ over recipe':'▲ under'}</span></div></div>
     <div class="kpi"><div class="lab">Food-only variance</div><div class="big ${food<0?'neg':''} tnum">${RM(food)}</div><div class="sub mut">packaging excluded</div></div>
     <div class="kpi"><div class="lab">Biggest single item</div><div class="big tnum">${big?big.name.split(' ')[0]:'—'}</div><div class="sub"><span class="pill ${big&&big.varrm<0?'c':'g'}">${big?RM(big.varrm):''}</span></div></div>
@@ -852,6 +853,7 @@ function confirmBox(opts){return new Promise(res=>{const ov=document.getElementB
   ok.textContent=opts.ok||'Delete';ov.hidden=false;
   const done=v=>{ov.hidden=true;ok.onclick=null;no.onclick=null;ov.onclick=null;res(v);};
   ok.onclick=()=>done(true);no.onclick=()=>done(false);ov.onclick=e=>{if(e.target===ov)done(false);};});}
+function meLabel(){return (ME&&ME.user_metadata&&(ME.user_metadata.full_name||ME.user_metadata.name))||(ME&&ME.email)||'';}
 function renderDataList(){const el=document.getElementById('dataList');if(!el)return;
   const keys=Object.keys(DATA).filter(k=>DATA[k]&&DATA[k].items&&DATA[k].items.length).sort((a,b)=>{const A=DATA[a],B=DATA[b];return A.outlet===B.outlet?dnum(A.date)-dnum(B.date):(A.outlet<B.outlet?-1:1);});
   if(!keys.length){el.innerHTML='<p class="mut" style="padding:6px 2px">No data saved yet.</p>';return;}
@@ -863,7 +865,7 @@ function renderApprovals(){const el=document.getElementById('apWrap');if(!el)ret
   el.innerHTML=PENDING.map(r=>`<div class="aprow"><div><b>${r.outlet||''}</b> <span class="mut">${r.date||''}</span><div class="mut sm">Requested by ${r.requester_email||'\u2014'}</div></div><div class="apbtns"><button class="dbtn ok" data-ap="${r.id}" data-k="${r.dataset_id}">Approve</button><button class="dbtn no" data-rej="${r.id}">Reject</button></div></div>`).join('');}
 function updateApBadge(){const b=document.getElementById('apBadge');if(!b)return;const n=PENDING.length;if(n&&ROLE==='admin'){b.textContent=n;b.hidden=false;}else{b.hidden=true;}}
 async function loadRequests(){if(!sb)return;try{const {data,error}=await sb.from('delete_requests').select('*').eq('status','pending').order('created_at');if(error)throw error;PENDING=data||[];PENDING_DEL=new Set(PENDING.map(r=>r.dataset_id));renderDataList();renderApprovals();updateApBadge();}catch(e){console.error('loadRequests',e);}}
-async function requestDelete(k){const d=DATA[k];if(!d||!sb)return;try{const {error}=await sb.from('delete_requests').insert({dataset_id:k,outlet:d.outlet,date:d.date,requested_by:ME&&ME.id,requester_email:ME&&ME.email});if(error)throw error;PENDING_DEL.add(k);renderDataList();}catch(e){console.error('requestDelete',e);renderDataList();}}
+async function requestDelete(k){const d=DATA[k];if(!d||!sb)return;try{const {error}=await sb.from('delete_requests').insert({dataset_id:k,outlet:d.outlet,date:d.date,requested_by:ME&&ME.id,requester_email:meLabel()});if(error)throw error;PENDING_DEL.add(k);renderDataList();}catch(e){console.error('requestDelete',e);renderDataList();}}
 async function adminDelete(k){try{if(sb){const {error}=await sb.from('datasets').delete().eq('id',k);if(error)throw error;await sb.from('delete_requests').update({status:'approved',resolved_by:ME&&ME.id,resolved_at:new Date().toISOString()}).eq('dataset_id',k).eq('status','pending');}const wasCur=(curO+'|'+curD)===k;delete DATA[k];PENDING_DEL.delete(k);if(wasCur)pickDefault();renderAll();await loadRequests();}catch(e){console.error('adminDelete',e);renderAll();}}
 async function rejectReq(id){try{if(sb)await sb.from('delete_requests').update({status:'rejected',resolved_by:ME&&ME.id,resolved_at:new Date().toISOString()}).eq('id',id);}catch(e){console.error('rejectReq',e);}await loadRequests();}
 function applyRole(){document.querySelectorAll('[data-role]').forEach(el=>{const r=el.getAttribute('data-role');el.hidden=(r==='admin')?(ROLE!=='admin'):(ROLE==='admin');});const rb=document.getElementById('roleBadge');if(rb){rb.textContent=ROLE==='admin'?'Admin':'Staff';rb.className='rolebadge '+(ROLE==='admin'?'adm':'usr');rb.hidden=false;}}
@@ -879,7 +881,7 @@ let authMode='in',booted=false;
 function authErr(m){const e=document.getElementById('authErr');if(m){e.textContent=m;e.hidden=false;}else{e.hidden=true;}}
 function showGate(){gateEl.hidden=false;appEl.hidden=true;}
 function bootApp(){if(booted)return;booted=true;renderAll();if(sb){setCloud('loading');cloudLoad().then(()=>loadRequests());}else{setCloud('off');}}
-async function onAuthed(session){ME=session.user;gateEl.hidden=true;appEl.hidden=false;const uc=document.getElementById('userChip');uc.textContent=session.user.email;uc.hidden=false;document.getElementById('signOut').hidden=false;ROLE='user';try{if(sb){const {data}=await sb.from('profiles').select('role').eq('id',session.user.id).maybeSingle();if(data&&data.role)ROLE=data.role;}}catch(e){console.error('role',e);}applyRole();bootApp();}
+async function onAuthed(session){ME=session.user;gateEl.hidden=true;appEl.hidden=false;const uc=document.getElementById('userChip');const _md=session.user.user_metadata||{};uc.textContent=_md.full_name||_md.name||session.user.email;uc.hidden=false;document.getElementById('signOut').hidden=false;ROLE='user';try{if(sb){const {data}=await sb.from('profiles').select('role').eq('id',session.user.id).maybeSingle();if(data&&data.role)ROLE=data.role;}}catch(e){console.error('role',e);}applyRole();bootApp();}
 if(sb){
   appEl.hidden=true;
   const btn=document.getElementById('authBtn'),emailI=document.getElementById('authEmail'),passI=document.getElementById('authPass');
@@ -888,14 +890,14 @@ if(sb){
     sub.textContent=m==='in'?'Sign in to view the dashboard':'Create an account to get access';
     btn.textContent=m==='in'?'Sign in':'Create account';
     passI.autocomplete=m==='in'?'current-password':'new-password';
-    swapLine.innerHTML=m==='in'?'New here? <a href="#" data-swap>Create an account</a>':'Have an account? <a href="#" data-swap>Sign in</a>';}
+    swapLine.innerHTML=m==='in'?'New here? <a href="#" data-swap>Create an account</a>':'Have an account? <a href="#" data-swap>Sign in</a>';const nf=document.getElementById('nameField');if(nf)nf.hidden=(m==='in');const ni=document.getElementById('authName');if(ni)ni.required=(m==='up');}
   swapLine.addEventListener('click',e=>{const a=e.target.closest('[data-swap]');if(!a)return;e.preventDefault();setMode(authMode==='in'?'up':'in');});
   document.getElementById('authForm').addEventListener('submit',async e=>{
     e.preventDefault();authErr('');const old=btn.textContent;btn.disabled=true;btn.textContent='…';
     const creds={email:emailI.value.trim(),password:passI.value};
     try{
       if(authMode==='in'){const {error}=await sb.auth.signInWithPassword(creds);if(error)throw error;}
-      else{const {data,error}=await sb.auth.signUp(creds);if(error)throw error;
+      else{const nm=(document.getElementById('authName').value||'').trim();const {data,error}=await sb.auth.signUp({...creds,options:{data:{full_name:nm}}});if(error)throw error;
         if(!data.session){authErr('Account created. Check your email to confirm, then sign in.');setMode('in');btn.disabled=false;btn.textContent='Sign in';return;}}
     }catch(err){authErr((err&&err.message)||'Sign in failed');btn.disabled=false;btn.textContent=old;return;}
     btn.disabled=false;btn.textContent=old;
