@@ -519,6 +519,9 @@ td .cat{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spac
 .datamgr{margin-top:26px}
 .datarow,.aprow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);margin-bottom:8px}
 .drmeta{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.drleft{min-width:0}
+.flrow{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.fchip{background:var(--surface-2);border:1px solid var(--line);border-radius:7px;padding:2px 8px;font-size:11px;color:var(--muted);word-break:break-all}
 .apbtns{display:flex;gap:8px;flex-shrink:0}
 .sm{font-size:11.5px}
 .dbtn{border:1px solid var(--line);background:var(--surface-2);border-radius:9px;padding:7px 13px;font-family:var(--font-body);font-size:12.5px;font-weight:600;color:var(--ink);cursor:pointer}
@@ -650,7 +653,7 @@ const SUPABASE_URL='https://eqfrsbznxuhtxihrwbsr.supabase.co';      // e.g. http
 const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxZnJzYnpueHVodHhpaHJ3YnNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1ODUxOTAsImV4cCI6MjExMTE2MTE5MH0.uVm2fI8uVNFwhUe2QQkipWp0rXHPHJU_z4iAhIVg3Yg'; // your anon public key
 /* ========================================================== */
 let sb=null;try{if(SUPABASE_URL&&SUPABASE_ANON_KEY&&window.supabase){sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);}}catch(e){console.error('supabase init',e);}
-let ROLE='user',ME=null,PENDING=[],PENDING_DEL=new Set(),TOUCHED=new Set();
+let ROLE='user',ME=null,PENDING=[],PENDING_DEL=new Set(),TOUCHED=new Set(),CURFILE=null;
 try{if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}catch(e){}
 const DATA={}; let curO=null, curD=null; const grnDocs=[]; const fileNames={sales:[],stockcount:[],movement:[],grn:[]};
 const num=v=>{if(v==null)return 0;if(typeof v==='number')return v;const n=parseFloat(String(v).replace(/,/g,''));return isNaN(n)?0:n;};
@@ -666,7 +669,7 @@ function timeOf(v){if(typeof v==='number'){const o=XLSX.SSF.parse_date_code(v);i
 
 function rowsOf(wb){const ws=wb.Sheets[wb.SheetNames[0]];return XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});}
 function detect(wb){const first=(wb.SheetNames[0]||'');if(/MVMT|MOVEMENT/i.test(first))return 'movement';const R=rowsOf(wb);for(const row of R.slice(0,16)){const j=(row||[]).map(S).join(' ');if(/Movement Date/i.test(j))return 'movement';if(/Document No\./i.test(j)||/Stock Count/i.test(j))return 'stockcount';if(/Product Sales/i.test(j))return 'sales';}return null;}
-function ensure(key,disp,date){if(!DATA[key])DATA[key]={ok:norm(disp),outlet:clean(disp),date:date,items:null,counts:{},sales:null,mv:null,sample:false};TOUCHED.add(key);return DATA[key];}
+function ensure(key,disp,date){if(!DATA[key])DATA[key]={ok:norm(disp),outlet:clean(disp),date:date,items:null,counts:{},sales:null,mv:null,sample:false};TOUCHED.add(key);if(CURFILE){const D=DATA[key];D.files=D.files||[];if(!D.files.includes(CURFILE))D.files.push(CURFILE);}return DATA[key];}
 
 function ingestCount(R){let meta={},hi=-1;for(let i=0;i<R.length;i++){const k=S(R[i][0]);if(k==='Document No.')meta.doc=S(R[i][1]);else if(k==='Document Date')meta.date=dateOf(R[i][1]);else if(k==='Branch Name')meta.branch=S(R[i][1]);else if(k==='No.'){hi=i;break;}}
   if(!meta.branch||hi<0)return;const items=[];for(let i=hi+1;i<R.length;i++){const code=S(R[i][1]);if(!code.startsWith('USRW'))continue;items.push({code,name:titl(R[i][2]),cat:S(R[i][3]),sys:num(R[i][5]),uom:S(R[i][6]),phys:num(R[i][7]),varq:num(R[i][10]),varrm:num(R[i][13])});}
@@ -679,7 +682,7 @@ function ingestSales(R){let date='';for(const row of R.slice(0,8)){const j=(row|
   let outlet=null,item=null;const by={};for(const r of R){const c0=S(r[0]),c1=S(r[1]),c2=S(r[2]);const mo=c0.match(/^Outlet:\s*(\S+)-(.*)/);const mi=c1.match(/^Item:\s*([A-Z0-9]+)-(.*)/);if(mo){outlet=mo[2].trim();}else if(mi){item={p:mi[1],n:mi[2].trim()};}else if(c2==='Subtotal'&&item){const o=outlet;by[o]=by[o]||{pizzas:0,units:0,net:0};const q=num(r[8]);by[o].net+=num(r[5]);if(item.p.startsWith('ZA')){by[o].units+=q;if(/personal|regular|large/i.test(item.n))by[o].pizzas+=q;}item=null;}}
   for(const o in by){if(!date)continue;const key=norm(o)+'|'+date;const d=ensure(key,o,date);d.sales=by[o];}}
 
-async function handleFiles(list){TOUCHED=new Set();let n=0,i=0;const total=list.length;for(const f of list){i++;const _st=document.getElementById('upStatus');if(_st)_st.textContent='Parsing '+i+' of '+total+': '+f.name+'\u2026';await new Promise(r=>setTimeout(r,0));try{if(/\.pdf$/i.test(f.name)){grnDocs.push(f.name);fileNames.grn.push(f.name);try{const gb=await f.arrayBuffer();const g=await parseGrnPdf(gb);if(g.no&&g.items.length&&g.date){const gk=norm(g.storage)+'|'+g.date;const gd=ensure(gk,g.storage,g.date);gd.grns=gd.grns||[];if(!gd.grns.some(x=>x.no===g.no))gd.grns.push({no:g.no,items:g.items});}}catch(e){console.error('grn parse',f.name,e);}n++;continue;}const buf=await f.arrayBuffer();const wb=XLSX.read(new Uint8Array(buf),{type:'array',dense:true});const k=detect(wb);const R=rowsOf(wb);if(k==='stockcount'){ingestCount(R);fileNames.stockcount.push(f.name);}else if(k==='movement'){ingestMovement(R);fileNames.movement.push(f.name);}else if(k==='sales'){ingestSales(R);fileNames.sales.push(f.name);}else{continue;}n++;}catch(e){console.error('parse fail',f.name,e);}}
+async function handleFiles(list){TOUCHED=new Set();let n=0,i=0;const total=list.length;for(const f of list){i++;CURFILE=f.name;const _st=document.getElementById('upStatus');if(_st)_st.textContent='Parsing '+i+' of '+total+': '+f.name+'\u2026';await new Promise(r=>setTimeout(r,0));try{if(/\.pdf$/i.test(f.name)){grnDocs.push(f.name);fileNames.grn.push(f.name);try{const gb=await f.arrayBuffer();const g=await parseGrnPdf(gb);if(g.no&&g.items.length&&g.date){const gk=norm(g.storage)+'|'+g.date;const gd=ensure(gk,g.storage,g.date);gd.grns=gd.grns||[];if(!gd.grns.some(x=>x.no===g.no))gd.grns.push({no:g.no,items:g.items});}}catch(e){console.error('grn parse',f.name,e);}n++;continue;}const buf=await f.arrayBuffer();const wb=XLSX.read(new Uint8Array(buf),{type:'array',dense:true});const k=detect(wb);const R=rowsOf(wb);if(k==='stockcount'){ingestCount(R);fileNames.stockcount.push(f.name);}else if(k==='movement'){ingestMovement(R);fileNames.movement.push(f.name);}else if(k==='sales'){ingestSales(R);fileNames.sales.push(f.name);}else{continue;}n++;}catch(e){console.error('parse fail',f.name,e);}}
   if(!curKey())pickDefault();
   const _now=new Date().toISOString(),_who=meLabel();TOUCHED.forEach(k=>{if(DATA[k]){DATA[k].upAt=_now;if(_who)DATA[k].upBy=_who;}});renderAll();if(sb){setCloud('loading');await cloudSave(TOUCHED);}return n;}
 
@@ -859,7 +862,9 @@ function renderDataList(){const el=document.getElementById('dataList');if(!el)re
   if(!keys.length){el.innerHTML='<p class="mut" style="padding:6px 2px">No data saved yet.</p>';return;}
   el.innerHTML=keys.map(k=>{const d=DATA[k];const pend=PENDING_DEL.has(k);
     const btn=ROLE==='admin'?`<button class="dbtn del" data-del="${k}">Delete</button>`:(pend?`<span class="pendtag">Delete requested</span>`:`<button class="dbtn req" data-req="${k}">Request delete</button>`);
-    const by=d.upBy?`Uploaded by ${d.upBy}${d.upAt?' \u00b7 '+fmtTs(d.upAt):''}`:(d.upAt?`Uploaded ${fmtTs(d.upAt)}`:'');return `<div class="datarow"><div><b>${d.outlet}</b> <span class="mut">${d.date}</span>${by?`<div class="mut sm">${by}</div>`:''}</div><div class="drmeta"><span class="mut sm">${d.items.length} items</span>${btn}</div></div>`;}).join('');}
+    const by=d.upBy?`Uploaded by ${d.upBy}${d.upAt?' \u00b7 '+fmtTs(d.upAt):''}`:(d.upAt?`Uploaded ${fmtTs(d.upAt)}`:'');
+    const fl=(d.files&&d.files.length)?`<div class="mut sm flrow">${d.files.map(n=>`<span class="fchip">${n}</span>`).join('')}</div>`:'';
+    return `<div class="datarow"><div class="drleft"><b>${d.outlet}</b> <span class="mut">${d.date}</span>${by?`<div class="mut sm">${by}</div>`:''}${fl}</div><div class="drmeta"><span class="mut sm">${d.items.length} items</span>${btn}</div></div>`;}).join('');}
 function renderApprovals(){const el=document.getElementById('apWrap');if(!el)return;
   if(!PENDING.length){el.innerHTML='<p class="mut" style="padding:6px 2px">No pending requests.</p>';return;}
   el.innerHTML=PENDING.map(r=>`<div class="aprow"><div><b>${r.outlet||''}</b> <span class="mut">${r.date||''}</span><div class="mut sm">Requested by ${r.requester_email||'\u2014'}</div></div><div class="apbtns"><button class="dbtn ok" data-ap="${r.id}" data-k="${r.dataset_id}">Approve</button><button class="dbtn no" data-rej="${r.id}">Reject</button></div></div>`).join('');}
