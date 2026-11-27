@@ -538,7 +538,6 @@ td .cat{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spac
       <p>Drop each file in its box below (or any box &mdash; the type is detected automatically). All four give a complete, cross-checkable day.</p>
     </div>
     <div class="toolbar">
-      <button class="btn pri" id="sampleBtn">Load Ampang 24 Nov sample</button>
       <button class="btn" id="clearBtn">Clear all</button>
     </div>
     <div class="uz">
@@ -652,9 +651,9 @@ function renderSelectors(){const os=outlets();const d=cur();
   const dp=document.getElementById('datePop');const dts=curO?datesFor(curO):[];
   dp.innerHTML=dts.length?dts.map(dt=>`<button data-d="${dt}" class="${dt===curD?'on':''}">${dt}</button>`).join(''):'<button class="dis" disabled>—</button>';}
 
-function emptyState(msg){return `<div class="empty"><div class="eic">&#128229;</div><h3>No data loaded</h3><p>${msg}</p><button class="btn pri" onclick="document.querySelector('#nav button[data-s=upload]').click()">Go to Upload</button> <button class="btn" onclick="loadSample()">Load 24 Nov sample</button></div>`;}
+function emptyState(msg){return `<div class="empty"><div class="eic">&#128229;</div><h3>No data loaded</h3><p>${msg}</p><button class="btn pri" onclick="document.querySelector('#nav button[data-s=upload]').click()">Go to Upload</button></div>`;}
 
-function renderOverview(){const d=cur();const w=document.getElementById('ovWrap');if(!d){w.innerHTML=emptyState('Upload your Sales, Stock&nbsp;Count and Stock&nbsp;Movement Excel files on the Upload tab, or load the Ampang&nbsp;24&nbsp;Nov sample to see how it works.');return;}
+function renderOverview(){const d=cur();const w=document.getElementById('ovWrap');if(!d){w.innerHTML=emptyState('Upload the daily Sales, Stock&nbsp;Count and Stock&nbsp;Movement Excel files on the Upload tab to begin.');return;}
   const items=d.items;const tot=items.reduce((s,x)=>s+x.varrm,0);const food=items.filter(x=>x.cat==='FOOD').reduce((s,x)=>s+x.varrm,0);
   const big=items.slice().sort((a,b)=>a.varrm-b.varrm)[0];const flagged=items.filter(x=>Math.abs(x.varrm)>=10).length;const onT=items.length-flagged;
   const maxAbs=Math.max(...items.map(x=>Math.abs(x.varrm)),1);
@@ -715,7 +714,6 @@ document.body.addEventListener('click',e=>{const r=e.target.closest('[data-code]
 document.getElementById('sx').onclick=closeSide;document.getElementById('scrim').onclick=closeSide;
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSide();});
 document.querySelectorAll('.filein').forEach(inp=>inp.addEventListener('change',async e=>{const f=[...e.target.files];if(!f.length)return;document.getElementById('upStatus').textContent='Parsing '+f.length+' file(s)…';const n=await handleFiles(f);document.getElementById('upStatus').textContent=n+' file(s) added.';renderUpload();e.target.value='';}));
-document.getElementById('sampleBtn').onclick=loadSample;
 document.getElementById('clearBtn').onclick=()=>{for(const k in DATA)delete DATA[k];grnDocs.length=0;for(const k in fileNames)fileNames[k].length=0;curO=curD=null;renderAll();if(sb)sb.from('datasets').delete().neq('id','__none__').then(()=>setCloud('synced'));};
 // outlet/date popovers
 const outBtn=document.getElementById('outBtn'),outPop=document.getElementById('outPop'),dateBtn=document.getElementById('dateBtn'),datePop=document.getElementById('datePop');
