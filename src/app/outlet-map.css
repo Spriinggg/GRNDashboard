@@ -1,0 +1,65 @@
+/* Outlet map pins and dark mode map tiles (Leaflet adds its own classes). */
+.outlet-pin {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  transform: translate(-50%, calc(-100% - 8px));
+  padding: 4px 10px;
+  border: 2px solid var(--primary);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--foreground);
+  font: 600 12px/1.2 var(--font-sans), sans-serif;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.18);
+  position: relative;
+}
+.outlet-pin::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 8px;
+  height: 8px;
+  background: inherit;
+  border-right: 2px solid var(--primary);
+  border-bottom: 2px solid var(--primary);
+  transform: translateX(-50%) rotate(45deg);
+}
+.outlet-pin[data-hot="true"] {
+  border-color: var(--danger);
+}
+.outlet-pin[data-hot="true"]::after {
+  border-color: var(--danger);
+}
+.outlet-pin[data-selected="true"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.outlet-pin b {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.leaflet-container {
+  font-family: var(--font-sans), sans-serif;
+  background: var(--muted);
+}
+.leaflet-marker-icon:focus-visible .outlet-pin {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.dark .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
+}
+
+/* An outlet with no data yet is a small dot, so the pins with figures stand out. */
+.outlet-pin[data-empty="true"] {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  gap: 0;
+  border-color: var(--muted-foreground);
+  transform: translate(-50%, -50%);
+}
+.outlet-pin[data-empty="true"]::after { display: none; }
+.outlet-pin[data-empty="true"][data-selected="true"] { background: var(--primary); border-color: var(--primary); }

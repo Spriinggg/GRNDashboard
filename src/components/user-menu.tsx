@@ -1,0 +1,44 @@
+"use client";
+
+import { LogOut } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+// There is no login yet, so the email comes from NEXT_PUBLIC_USER_EMAIL (see .env.example).
+// When Supabase Auth is added, read the email from the session and call supabase.auth.signOut() in signOut().
+const email = process.env.NEXT_PUBLIC_USER_EMAIL || "guest@uspizza.local";
+
+// Ends the session in this browser: a reload drops everything held in memory. It never touches cloud data.
+function signOut() {
+  window.location.assign("/");
+}
+
+export function UserMenu() {
+  return (
+    <Popover>
+      <PopoverTrigger
+        aria-label={`Account menu for ${email}`}
+        title={email}
+        className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-foreground uppercase outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {email.charAt(0)}
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 gap-1 p-2">
+        <div className="px-2 py-1.5">
+          <p className="text-xs text-muted-foreground">Signed in as</p>
+          <p className="truncate text-sm font-medium" title={email}>
+            {email}
+          </p>
+        </div>
+        <div className="my-1 h-px bg-border" />
+        <button
+          type="button"
+          onClick={signOut}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <LogOut className="size-4" />
+          Sign out
+        </button>
+      </PopoverContent>
+    </Popover>
+  );
+}
