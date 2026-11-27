@@ -1,0 +1,2 @@
+Snapshot of origin/main at cabb27d (reference only, not merged).
+Latest main features live in index.html and README.md here.
