@@ -486,6 +486,8 @@ td .cat{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spac
 .sumone.wide{max-width:580px}
 .sumtop{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:860px;margin:0 auto 16px}
 .sumchart{max-width:600px;margin:0 auto}
+.datein{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:8px 12px;font-family:var(--font-body);font-size:13px;font-weight:600;color:var(--ink);box-shadow:var(--shadow);cursor:pointer;color-scheme:light}
+.datein:disabled{opacity:.5;cursor:not-allowed}
 .howto{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:16px}
 .howto h4{font-family:var(--font-head);font-size:14px;font-weight:600;margin:0 0 10px}
 .howto ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:7px}
@@ -510,10 +512,7 @@ td .cat{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spac
         <button class="sel outlet" id="outBtn"><span class="dot"></span><span id="outLbl">&mdash;</span> <span class="mut">&#9662;</span></button>
         <div class="pop" id="outPop" hidden></div>
       </div>
-      <div class="menwrap">
-        <button class="sel date" id="dateBtn"><span id="dateLbl">&mdash;</span> <span class="mut">&#9662;</span></button>
-        <div class="pop" id="datePop" hidden></div>
-      </div>
+      <input type="date" class="datein" id="dateIn">
     </div>
   </div>
   <nav id="nav">
@@ -561,8 +560,8 @@ const SAMPLE_MV={"USRW00009": {"code": "USRW00009", "name": "Anchor Mozzarella C
 
 const HQ=["Ampang","Kelana Jaya","Dang Wangi","Kota Warisan","Ayer Keroh","Banting","Batu Pahat","Citta Mall","Greenlane","Kota Laksamana","Kamunting Taiping","Kiara Bay","Kota Damansara","Anggun City","Gamuda Cove","Hextar Empire City","Lotus Seberang Jaya","Mount Austin","Mydin Subang","Bukit Mertajam","Dpulze","Lucernce Square","Batu Pahat Mall","Kota Kemuning","Shah Alam","Putrajaya","Nilai","Kajang","Selayang","Taiping","Ipoh","Jalan Ipoh","Sri Gombak","Setia Alam","Bangi","Central I-City","Melaka Cheng Baru","Melawati Mall","Prima Saujana","Puncak Alam","USJ 21","Sunway Wangsa Walk","Matahari Sri Manja","Seksyen 13"];
 /* ====== SUPABASE CONFIG — paste your two values here ====== */
-const SUPABASE_URL='https://eqfrsbznxuhtxihrwbsr.supabase.co';
-const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxZnJzYnpueHVodHhpaHJ3YnNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1ODUxOTAsImV4cCI6MjExMTE2MTE5MH0.uVm2fI8uVNFwhUe2QQkipWp0rXHPHJU_z4iAhIVg3Yg';
+const SUPABASE_URL='https://eqfrsbznxuhtxihrwbsr.supabase.co';      // e.g. https://xxxxxxxx.supabase.co
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxZnJzYnpueHVodHhpaHJ3YnNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1ODUxOTAsImV4cCI6MjExMTE2MTE5MH0.uVm2fI8uVNFwhUe2QQkipWp0rXHPHJU_z4iAhIVg3Yg'; // your anon public key
 /* ========================================================== */
 let sb=null;try{if(SUPABASE_URL&&SUPABASE_ANON_KEY&&window.supabase){sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);}}catch(e){console.error('supabase init',e);}
 try{if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}catch(e){}
@@ -594,14 +593,18 @@ function ingestSales(R){let date='';for(const row of R.slice(0,8)){const j=(row|
   for(const o in by){if(!date)continue;const key=norm(o)+'|'+date;const d=ensure(key,o,date);d.sales=by[o];}}
 
 async function handleFiles(list){let n=0,i=0;const total=list.length;for(const f of list){i++;const _st=document.getElementById('upStatus');if(_st)_st.textContent='Parsing '+i+' of '+total+': '+f.name+'\u2026';await new Promise(r=>setTimeout(r,0));try{if(/\.pdf$/i.test(f.name)){grnDocs.push(f.name);fileNames.grn.push(f.name);try{const gb=await f.arrayBuffer();const g=await parseGrnPdf(gb);if(g.no&&g.items.length&&g.date){const gk=norm(g.storage)+'|'+g.date;const gd=ensure(gk,g.storage,g.date);gd.grns=gd.grns||[];if(!gd.grns.some(x=>x.no===g.no))gd.grns.push({no:g.no,items:g.items});}}catch(e){console.error('grn parse',f.name,e);}n++;continue;}const buf=await f.arrayBuffer();const wb=XLSX.read(new Uint8Array(buf),{type:'array',dense:true});const k=detect(wb);const R=rowsOf(wb);if(k==='stockcount'){ingestCount(R);fileNames.stockcount.push(f.name);}else if(k==='movement'){ingestMovement(R);fileNames.movement.push(f.name);}else if(k==='sales'){ingestSales(R);fileNames.sales.push(f.name);}else{continue;}n++;}catch(e){console.error('parse fail',f.name,e);}}
-  if(!curKey()){const k=firstKeyWithItems();if(k){curO=DATA[k].ok;curD=DATA[k].date;}}
+  if(!curKey())pickDefault();
   renderAll();if(sb){setCloud('loading');await cloudSave(new Set(Object.keys(DATA)));}return n;}
 
 function curKey(){return curO&&curD?curO+'|'+curD:null;}
 function cur(){const k=curKey();return k?DATA[k]:null;}
 function firstKeyWithItems(){return Object.keys(DATA).find(k=>DATA[k].items&&DATA[k].items.length);}
 function outlets(){const m={};for(const k in DATA){const d=DATA[k];if(!d.items)continue;(m[d.ok]=m[d.ok]||{name:d.outlet,dates:[]}).dates.push(d.date);}return m;}
-function datesFor(ok){return Object.keys(DATA).filter(k=>DATA[k].ok===ok&&DATA[k].items).map(k=>DATA[k].date).sort();}
+function dnum(d){const p=String(d).split('/');return p.length===3?+(p[2]+p[1].padStart(2,'0')+p[0].padStart(2,'0')):0;}
+function datesFor(ok){return Object.keys(DATA).filter(k=>DATA[k].ok===ok&&DATA[k].items).map(k=>DATA[k].date).sort((a,b)=>dnum(a)-dnum(b));}
+function iso(d){const p=String(d).split('/');return p.length===3?(p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0')):'';}
+function deiso(v){const p=String(v).split('-');return p.length===3?(p[2]+'/'+p[1]+'/'+p[0]):'';}
+function pickDefault(){const os=Object.keys(outlets());if(!os.length){curO=curD=null;return;}if(!curO||!outlets()[curO])curO=os[0];const ds=datesFor(curO);curD=ds.length?ds[ds.length-1]:null;}
 
 /* ---------- render ---------- */
 function statusOf(it){if(it.varrm<=-50)return['crit','critical'];if(it.varrm<=-10)return['warn','short'];if(it.varrm>=50)return['info','surplus'];if(it.varrm>=10)return['info','over'];return['good','on target'];}
@@ -643,7 +646,7 @@ function sumSection(d){const m=money(d);const head=`<div class="sechead" style="
 
 function setCloud(s){const el=document.getElementById('cloudPill');if(!el)return;const map={off:['local only','w'],synced:['cloud synced','g'],saved:['saved to cloud','g'],loading:['loading…','w'],error:['cloud error','c']};const m=map[s]||map.off;el.textContent=m[0];el.className='pill '+m[1];}
 async function cloudSave(keys){if(!sb)return;const ks=[...keys].filter(k=>DATA[k]&&DATA[k].items&&DATA[k].items.length);if(!ks.length){setCloud('synced');return;}try{for(let i=0;i<ks.length;i+=20){const rows=ks.slice(i,i+20).map(k=>({id:k,outlet:DATA[k].outlet,outlet_key:DATA[k].ok,date:DATA[k].date,data:DATA[k]}));const {error}=await sb.from('datasets').upsert(rows);if(error)throw error;}setCloud('saved');setTimeout(()=>setCloud('synced'),1500);}catch(e){console.error('cloudSave',e);setCloud('error');}}
-async function cloudLoad(){if(!sb)return;try{setCloud('loading');const {data,error}=await sb.from('datasets').select('id,data');if(error)throw error;(data||[]).forEach(r=>{if(r.data)DATA[r.id]=r.data;});if(!curKey()){const k=firstKeyWithItems();if(k){curO=DATA[k].ok;curD=DATA[k].date;}}renderAll();setCloud('synced');}catch(e){console.error('cloudLoad',e);setCloud('error');}}
+async function cloudLoad(){if(!sb)return;try{setCloud('loading');const {data,error}=await sb.from('datasets').select('id,data');if(error)throw error;(data||[]).forEach(r=>{if(r.data)DATA[r.id]=r.data;});if(!curKey())pickDefault();renderAll();setCloud('synced');}catch(e){console.error('cloudLoad',e);setCloud('error');}}
 async function parseGrnPdf(buf){
   const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
   const allstr=[];const items=[];
@@ -677,11 +680,10 @@ function renderAll(){renderSelectors();renderOverview();renderVariance();renderD
 
 function renderSelectors(){const os=outlets();const d=cur();
   document.getElementById('outLbl').textContent=d?d.outlet:'—';
-  document.getElementById('dateLbl').textContent=d?d.date:'—';
   const op=document.getElementById('outPop');const names=Object.keys(os);
   op.innerHTML=names.length?names.map(ok=>`<button data-o="${ok}" class="${ok===curO?'on':''}">${os[ok].name} <span class="ok">${os[ok].dates.length}d</span></button>`).join(''):'<button class="dis" disabled>No outlets loaded</button>';
-  const dp=document.getElementById('datePop');const dts=curO?datesFor(curO):[];
-  dp.innerHTML=dts.length?dts.map(dt=>`<button data-d="${dt}" class="${dt===curD?'on':''}">${dt}</button>`).join(''):'<button class="dis" disabled>—</button>';}
+  const di=document.getElementById('dateIn');const dts=curO?datesFor(curO):[];
+  if(di){di.value=curD?iso(curD):'';di.disabled=!dts.length;if(dts.length){di.min=iso(dts[0]);di.max=iso(dts[dts.length-1]);}}}
 
 function emptyState(msg){return `<div class="empty"><div class="eic">&#128229;</div><h3>No data loaded</h3><p>${msg}</p><button class="btn pri" onclick="document.querySelector('#nav button[data-s=upload]').click()">Go to Upload</button></div>`;}
 
@@ -749,12 +751,12 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSide();});
 document.querySelectorAll('.filein').forEach(inp=>inp.addEventListener('change',async e=>{const f=[...e.target.files];if(!f.length)return;document.getElementById('upStatus').textContent='Parsing '+f.length+' file(s)…';const n=await handleFiles(f);document.getElementById('upStatus').textContent=n+' file(s) added.';renderUpload();e.target.value='';}));
 document.getElementById('clearBtn').onclick=()=>{for(const k in DATA)delete DATA[k];grnDocs.length=0;for(const k in fileNames)fileNames[k].length=0;curO=curD=null;renderAll();if(sb)sb.from('datasets').delete().neq('id','__none__').then(()=>setCloud('synced'));};
 // outlet/date popovers
-const outBtn=document.getElementById('outBtn'),outPop=document.getElementById('outPop'),dateBtn=document.getElementById('dateBtn'),datePop=document.getElementById('datePop');
-outBtn.onclick=e=>{e.stopPropagation();outPop.hidden=!outPop.hidden;datePop.hidden=true;};
-dateBtn.onclick=e=>{e.stopPropagation();datePop.hidden=!datePop.hidden;outPop.hidden=true;};
-document.addEventListener('click',e=>{if(!outPop.contains(e.target)&&!outBtn.contains(e.target))outPop.hidden=true;if(!datePop.contains(e.target)&&!dateBtn.contains(e.target))datePop.hidden=true;});
+const outBtn=document.getElementById('outBtn'),outPop=document.getElementById('outPop');
+outBtn.onclick=e=>{e.stopPropagation();outPop.hidden=!outPop.hidden;};
+document.addEventListener('click',e=>{if(!outPop.contains(e.target)&&!outBtn.contains(e.target))outPop.hidden=true;});
 outPop.addEventListener('click',e=>{const b=e.target.closest('button[data-o]');if(!b)return;curO=b.dataset.o;const dts=datesFor(curO);if(!dts.includes(curD))curD=dts.slice(-1)[0];outPop.hidden=true;renderAll();});
-datePop.addEventListener('click',e=>{const b=e.target.closest('button[data-d]');if(!b)return;curD=b.dataset.d;datePop.hidden=true;renderAll();});
+const dateIn=document.getElementById('dateIn');
+dateIn.onchange=()=>{const d=deiso(dateIn.value);if(curO&&DATA[curO+'|'+d]){curD=d;renderAll();}else{dateIn.value=curD?iso(curD):'';}};
 
 renderAll();
 if(sb){setCloud('loading');cloudLoad();}else{setCloud('off');}
