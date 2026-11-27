@@ -551,12 +551,16 @@ td .cat{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spac
 @media(max-width:700px){.kpis{grid-template-columns:repeat(2,1fr)}}
 .shell{display:flex;gap:18px;align-items:flex-start;margin-top:14px}
 .sidenav{flex:0 0 190px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);display:flex;flex-direction:column;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:10px}
-.sidenav .grp{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700;padding:11px 10px 4px}
+.sidenav button.grphead{display:flex;align-items:center;justify-content:space-between;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700;padding:11px 10px 7px}
+.sidenav button.grphead:hover{background:transparent;color:var(--ink)}
+.chev{font-size:9px;opacity:.65;transition:transform .15s ease}
+.navgrp.open .chev{transform:rotate(90deg)}
+.grpitems{display:flex;flex-direction:column;gap:2px;padding-bottom:4px}
 .sidenav button{text-align:left;border:0;background:transparent;color:var(--muted);font-family:var(--font-body);font-size:13.5px;font-weight:600;padding:9px 11px;border-radius:10px;cursor:pointer;width:100%}
 .sidenav button:hover{background:var(--surface-2);color:var(--ink)}
 .sidenav button[aria-current="true"]{background:var(--card-dark);color:var(--card-dark-fg)}
 .content{flex:1;min-width:0}
-@media(max-width:760px){.shell{flex-direction:column;gap:10px}.sidenav{flex:none;width:100%;position:static;flex-direction:row;flex-wrap:wrap;gap:4px}.sidenav .grp{width:100%;padding:8px 8px 2px}.sidenav button{width:auto}}
+@media(max-width:760px){.shell{flex-direction:column;gap:10px}.sidenav{flex:none;width:100%;position:static}}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -599,20 +603,40 @@ td .cat{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spac
   <div class="shell">
   <aside class="sidenav" id="nav">
     <button data-s="overview" aria-current="true">Overview</button>
-    <div class="grp">Sales &amp; P&amp;L</div>
-    <button data-s="sales">Sales</button>
-    <button data-s="pnl">P&amp;L</button>
-    <div class="grp">Stock &amp; GRN</div>
-    <button data-s="discipline">Count &amp; GRN</button>
-    <div class="grp">Operations</div>
-    <button data-s="treeams">Treeams</button>
-    <div class="grp">Usage &amp; Labour</div>
-    <button data-s="variance">Food Variance</button>
-    <button data-s="labor">Labour vs Sales</button>
-    <div class="grp">Manage</div>
-    <button data-s="outlets">Outlets</button>
-    <button data-s="upload">Upload data</button>
-    <button data-s="approvals" data-role="admin" hidden>Approvals <span class="apbadge" id="apBadge" hidden></span></button>
+    <div class="navgrp">
+      <button class="grphead">Sales &amp; P&amp;L <span class="chev">&#9656;</span></button>
+      <div class="grpitems" hidden>
+        <button data-s="sales">Sales</button>
+        <button data-s="pnl">P&amp;L</button>
+      </div>
+    </div>
+    <div class="navgrp">
+      <button class="grphead">Stock &amp; GRN <span class="chev">&#9656;</span></button>
+      <div class="grpitems" hidden>
+        <button data-s="discipline">Count &amp; GRN</button>
+      </div>
+    </div>
+    <div class="navgrp">
+      <button class="grphead">Operations <span class="chev">&#9656;</span></button>
+      <div class="grpitems" hidden>
+        <button data-s="treeams">Treeams</button>
+      </div>
+    </div>
+    <div class="navgrp">
+      <button class="grphead">Usage &amp; Labour <span class="chev">&#9656;</span></button>
+      <div class="grpitems" hidden>
+        <button data-s="variance">Food Variance</button>
+        <button data-s="labor">Labour vs Sales</button>
+      </div>
+    </div>
+    <div class="navgrp">
+      <button class="grphead">Manage <span class="chev">&#9656;</span></button>
+      <div class="grpitems" hidden>
+        <button data-s="outlets">Outlets</button>
+        <button data-s="upload">Upload data</button>
+        <button data-s="approvals" data-role="admin" hidden>Approvals <span class="apbadge" id="apBadge" hidden></span></button>
+      </div>
+    </div>
   </aside>
   <main class="content">
   <section id="overview"><div id="ovWrap"></div></section>
@@ -920,7 +944,14 @@ function closeSide(){document.getElementById('side').classList.remove('show');do
 function loadSample(){const key='AMPANG|24/11/2026';const items=SAMPLE_ITEMS;const d=ensure(key,'Ampang','24/11/2026');d.items=items;d.sample=true;d.nCounts=2;d.openDoc='SC/RM/26/0018607';d.closeDoc='SC/RM/26/0018633';d.sales={pizzas:78,units:149,net:1275.29};d.sum={sales:1275.29,ideal:338.47,actual:1705.79};d.mv=SAMPLE_MV;grnDocs.push('GRN_26_0010309.pdf','GRN_26_0010333.pdf');fileNames.grn.push('GRN_26_0010309.pdf','GRN_26_0010333.pdf');curO='AMPANG';curD='24/11/2026';renderAll();document.querySelector('#nav button[data-s=overview]').click();}
 
 /* ---------- events ---------- */
-document.getElementById('nav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;document.querySelectorAll('#nav button').forEach(x=>x.setAttribute('aria-current',x===b?'true':'false'));document.querySelectorAll('.content > section').forEach(s=>s.hidden=s.id!==b.dataset.s);window.scrollTo({top:0,behavior:'smooth'});});
+document.getElementById('nav').addEventListener('click',e=>{
+  const g=e.target.closest('.grphead');
+  if(g){const grp=g.parentElement;const open=grp.classList.contains('open');
+    document.querySelectorAll('#nav .navgrp').forEach(x=>{x.classList.remove('open');const it=x.querySelector('.grpitems');if(it)it.hidden=true;});
+    if(!open){grp.classList.add('open');const it=grp.querySelector('.grpitems');if(it)it.hidden=false;}return;}
+  const b=e.target.closest('button[data-s]');if(!b)return;
+  document.querySelectorAll('#nav button[data-s]').forEach(x=>x.setAttribute('aria-current',x===b?'true':'false'));
+  document.querySelectorAll('.content > section').forEach(s=>s.hidden=s.id!==b.dataset.s);window.scrollTo({top:0,behavior:'smooth'});});
 document.body.addEventListener('click',e=>{const r=e.target.closest('[data-code]');if(r){openItem(r.dataset.code);return;}const p=e.target.closest('[data-pick]');if(p){curO=p.dataset.pick;curD=datesFor(curO).slice(-1)[0];renderAll();document.querySelector('#nav button[data-s=overview]').click();}});
 document.getElementById('sx').onclick=closeSide;document.getElementById('scrim').onclick=closeSide;
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSide();});
