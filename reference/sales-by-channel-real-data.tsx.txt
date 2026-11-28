@@ -1,0 +1,40 @@
+"use client";
+
+import { useData } from "@/components/data-provider";
+import { PageHeader } from "@/components/page-header";
+import { EmptyNote, Stat } from "@/components/stat-card";
+import { RM, RM2 } from "@/lib/calc";
+
+const CHANNELS = [
+  ["ShopeeFood", "shopee"],
+  ["GrabFood", "grab"],
+  ["FoodPanda", "panda"],
+  ["US Pizza App", "app"],
+  ["Walk-in", "walkin"],
+] as const;
+
+export default function Sales() {
+  const { cur: d } = useData();
+  const total = d?.sales ? d.sales.net : null;
+  const cv = d?.channels ?? {};
+  return (
+    <>
+      <PageHeader title="Sales by channel" subtitle={d ? `${d.outlet}, ${d.date}. Where the day's sales came from.` : "Where the day's sales came from: delivery platforms, the US Pizza app and walk-in."} />
+      {!d ? (
+        <EmptyNote>Upload the Sales (POS) file on the Upload page to see sales.</EmptyNote>
+      ) : (
+        <>
+          <Stat label="Total net sales" value={total != null ? RM2(total) : "—"} sub="from POS" className="max-w-xs" />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {CHANNELS.map(([name, key]) => {
+              const v = cv[key];
+              const extra = key === "app" && cv.appOrders ? `${cv.appOrders} orders` : "";
+              return <Stat key={key} label={name} value={v != null ? RM(v) : "—"} sub={v != null ? extra || (total ? `${Math.round((v / total) * 100)}% of sales` : "") : "awaiting report"} />;
+            })}
+          </div>
+          <EmptyNote>The US Pizza App figure comes from the app order export (Upload page). The other channels need the POS Sales by Order Type / Channel report.</EmptyNote>
+        </>
+      )}
+    </>
+  );
+}

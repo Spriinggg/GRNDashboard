@@ -1,64 +1,66 @@
-# US Pizza · Food Control
+# US Pizza Food Control
 
-A daily inventory and **food-cost variance** dashboard for US Pizza outlets, modelled on the Domino's Pulse "Daily Inventory Usage" report. It reads the four daily reports an outlet already produces, joins them, and shows — for one outlet, one day — how much stock *should* have been used versus how much *actually* was, item by item.
+Next.js (App Router, TypeScript) dashboard for daily inventory and food cost variance. Excel files are parsed in the browser and the results are saved to Supabase (`datasets` table).
 
-**Live app:** https://grn-dashboard-seven.vercel.app
+## Run
 
-> Built as part of an industrial-training (LI) project. Currently live for the **Ampang** outlet; designed to scale to all 44 HQ outlets.
+```bash
+npm install
+cp .env.example .env.local   # then fill in the two values
+npm run dev                  # http://localhost:3000
+npm run build && npm start   # production
+```
 
----
+## Environment variables
 
-## What it does
+| Name | Where to find it |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase > Project Settings > API > Project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase > Project Settings > API > anon public key |
 
-- **Food-cost variance** — compares *ideal* usage (sales × recipe, from POS) against *actual* usage (opening + delivered − closing, from the physical count), per raw-material item.
-- **GRN auto-check** — reads the goods-received note (GRN) PDF and cross-checks every item against the Stock Movement "IN" records, flagging what was received but **not** recorded in the system.
-- **Daily Summary + Week-to-Date + Actual-vs-Ideal chart** — the headline numbers at a glance.
-- **Drill-down** — click any item to see its full movement timeline (deliveries, POS deductions, stock-count adjustments).
-- **Cloud sync** — every outlet-day is saved to Supabase, so the history is shared across devices and users.
+`NEXT_PUBLIC_` values are bundled into the browser by design, so the anon key is only safe when Row Level Security is on for `datasets`. Never put the `service_role` key in a `NEXT_PUBLIC_` variable or commit `.env.local`.
 
-## The four files to upload (per outlet, per day)
+## Structure
 
-| File | Source | Gives |
-|------|--------|-------|
-| **Product Sales Listing** | POS (Zeoniq) | *Ideal* (recipe) usage |
-| **Stock Count — Raw Materials (AM & PM)** | Codemax | *Physical* stock on the shelf |
-| **Stock Movement — Raw Materials** | Codemax | IN (received) and OUT (sales) per item |
-| **GRN — Goods Received Note** | Supplier delivery | The receiving record, cross-checked against the system |
+Same stack and patterns as Provena: Next.js App Router, Tailwind 4, shadcn/Base UI, lucide icons, Recharts and a Leaflet map.
 
-All files are parsed **in the browser** — they are never uploaded to any server except the computed result, which is saved to the project's own Supabase.
+- `src/app/` routes: Dashboard, Food variance (`?st=` and `?cat=` filters), Count & GRN, Outlets (map and list), Upload.
+- `src/components/` shell (sidebar, top bar), data provider (state and Supabase sync), charts, outlet map, item detail sheet, `ui/` primitives.
+- `src/lib/` Excel parsing, variance and food cost maths, outlet locations, Supabase client, sample data.
+- `index.html` is the earlier single-file version, kept for reference.
 
-## Roles
+Design follows the Provena design guide (DESIGN.md) with a US Pizza theme: warm cream neutrals in `src/app/globals.css`, blue as the brand and "okay" colour, green, yellow and red for status only. Outlet pins on the map are approximate positions in `src/lib/outlet-locations.ts`.
 
-| Role | Can do |
-|------|--------|
-| **Admin** | View, upload, delete any day directly, approve/reject staff delete requests |
-| **Staff** | View, upload, and *request* a delete — an admin approves before anything is removed |
+## How data is loaded (stage 1)
 
-Roles are set in Supabase (`profiles.role`). New sign-ups default to **Staff**.
+Files are parsed in the browser and each outlet-day is saved as one JSON row in `datasets`. The app does **not** pull every saved day when it opens:
 
----
+1. It reads an **index** of what is saved (`id`, `outlet_key`, `date_iso`, no data). This gives the first and last day and the number of days for each outlet.
+2. It then loads the **latest week** as one range query, the **latest day of each outlet** (so Outlets is right for an outlet that has not uploaded this week) and the Treeams row.
+3. A page that needs other dates calls `ensureRange(span)` from `useData()`. Only the days not loaded yet are fetched: by id when there are few, as one date-range query when there are many.
+4. Upload loads every saved day before it reads a file, so a day is never saved over with only part of what it had. This goes away in stage 2, where each kind of file has its own rows.
 
-## Tech
+`date_iso` was added by `supabase/migrations/20261128_add_datasets_date_iso.sql`. `supabase/stage2_schema_draft.sql` is a **draft, not applied**, for plain tables per file type and a rollup the pages read.
 
-- Single-file HTML app — no build step.
-- [SheetJS](https://sheetjs.com/) — parses the Excel reports.
-- [pdf.js](https://mozilla.github.io/pdf.js/) — parses the GRN PDFs.
-- [Supabase](https://supabase.com/) — authentication + cloud storage (Postgres + row-level security).
-- Hosted on [Vercel](https://vercel.com/).
+## CI and deployment
 
-## Setup (for a fresh deployment)
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request into `main`.
 
-1. **Supabase** — create a project. In the SQL Editor, run `supabase_auth_setup.sql` (creates the `datasets`, `profiles`, and `delete_requests` tables and their security policies).
-2. Under **Authentication → Sign In / Providers → Email**, turn **off** "Confirm email" so accounts work immediately.
-3. In `index.html`, set `SUPABASE_URL` and `SUPABASE_ANON_KEY` (near the top of the `<script>` block) to your project's values.
-4. **Vercel** — import the GitHub repo and deploy. Pushing to the repo auto-redeploys.
-5. Create your account in the app, then make yourself an admin:
-   ```sql
-   insert into public.profiles (id, email, role)
-   select id, email, 'admin' from auth.users where email = 'your@email.com'
-   on conflict (id) do update set role = 'admin';
-   ```
+1. **check** (always): `npm ci`, `npm run typecheck`, `npm run build` on Node 22. The Supabase values are optional here; without them the app builds in local-only mode, which proves it compiles.
+2. **deploy** (only when the Vercel secrets exist): a **preview** deployment for a pull request and a **production** deployment for a push to `main`, with the Vercel CLI. The deployment URL is written to the run summary. Pull requests from forks never deploy, because they cannot read secrets.
 
----
+### One-time setup
 
-*Maintained by Amirul — US Pizza industrial training project.*
+| Where | What |
+|---|---|
+| Vercel project, Settings, General | **Framework Preset: Next.js** (the project was a static `index.html`, so it may still say Other) |
+| Vercel project, Settings, Environment Variables | `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` for Production and Preview. These are the same public values the old `index.html` had inside it. Never the `service_role` key |
+| GitHub repo, Settings, Secrets and variables, Actions | `VERCEL_TOKEN` (Vercel, Account Settings, Tokens), `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` (both in `.vercel/project.json` after running `npx vercel link` once locally; do not commit that folder) |
+| GitHub repo, optional secrets | `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, only if you want the CI build to use them |
+| GitHub repo, Settings, Branches | Protect `main` and require the **Type check and build** check before merging |
+
+**Do not deploy twice.** If the Vercel project is also connected to this repository through Vercel's Git integration, every push is deployed by both Vercel and this workflow. Use one: keep the Git integration and delete the `deploy` job, or keep the job and turn the Git integration off (Vercel project, Settings, Git, Ignored Build Step, or `"git": { "deploymentEnabled": false }` in `vercel.json`).
+
+### Merging into `main`
+
+`main` still has the single-file `index.html`. Merge `main` into the branch first, resolve `index.html` by deleting it (the latest copy of main's file is kept in `reference/main-latest/`), run the checks, then open the pull request.

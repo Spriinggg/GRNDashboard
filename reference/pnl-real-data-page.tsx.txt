@@ -1,0 +1,45 @@
+"use client";
+
+import { useData } from "@/components/data-provider";
+import { PageHeader } from "@/components/page-header";
+import { EmptyNote } from "@/components/stat-card";
+import { Card } from "@/components/ui/card";
+import { RM2, money } from "@/lib/calc";
+import { cn } from "@/lib/utils";
+
+export default function Pnl() {
+  const { cur: d } = useData();
+  const m = d ? money(d) : null;
+  const sales = d ? (m?.ok ? m.sales : (d.sales?.net ?? 0)) : null;
+  const food = m?.ok ? m.actual : null;
+  const rows: { k: string; v: string; neg?: boolean; muted?: boolean; sep?: boolean }[] = [
+    { k: "Royalty sales", v: sales != null ? RM2(sales) : "—" },
+    { k: "Food cost (actual)", v: food != null ? RM2(food) : "—", neg: true },
+    { k: "Gross profit after food", v: sales != null && food != null ? RM2(sales - food) : "—", sep: true },
+    { k: "Labour cost", v: "—", muted: true },
+    { k: "Rent & utilities", v: "—", muted: true },
+    { k: "Other overheads", v: "—", muted: true },
+    { k: "Net profit", v: "—", muted: true, sep: true },
+  ];
+  return (
+    <>
+      <PageHeader title="Profit & loss" subtitle={d ? `${d.outlet}, ${d.date}. Sales and food cost are live; labour and overheads fill in when their reports are added.` : "Daily P&L for one outlet and day."} />
+      {!d ? (
+        <EmptyNote>Upload the Sales, Stock Count and Stock Movement files to build the P&amp;L.</EmptyNote>
+      ) : (
+        <>
+          <Card className="max-w-md gap-0 py-2 shadow-sm">
+            <h2 className="px-5 py-2 text-sm font-semibold">Daily P&amp;L</h2>
+            {rows.map((r) => (
+              <div key={r.k} className={cn("flex justify-between px-5 py-2.5 text-sm", r.sep && "border-t font-semibold", r.muted && "text-muted-foreground")}>
+                <span>{r.k}</span>
+                <span className={cn("tabular-nums", r.neg && "text-danger")}>{r.v}</span>
+              </div>
+            ))}
+          </Card>
+          <EmptyNote>Labour, rent and overheads need the payroll and expense reports. The layout is ready; the numbers fill in once those are uploaded.</EmptyNote>
+        </>
+      )}
+    </>
+  );
+}

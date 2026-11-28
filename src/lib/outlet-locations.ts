@@ -1,0 +1,53 @@
+// Approximate map positions for the 44 HQ outlets. Each point sits in the named town or mall area but is NOT
+// a surveyed shop address. Replace lat and lng with the real coordinates when they are available.
+export type Region = "klang" | "north" | "south";
+export type OutletLocation = { name: string; area: string; region: Region; lat: number; lng: number };
+
+export const outletLocations: OutletLocation[] = [
+  { name: "Ampang", area: "Ampang, Kuala Lumpur", region: "klang", lat: 3.15, lng: 101.76 },
+  { name: "Kelana Jaya", area: "Kelana Jaya, Selangor", region: "klang", lat: 3.1, lng: 101.605 },
+  { name: "Dang Wangi", area: "Dang Wangi, Kuala Lumpur", region: "klang", lat: 3.156, lng: 101.7 },
+  { name: "Kota Warisan", area: "Kota Warisan, Selangor", region: "klang", lat: 2.85, lng: 101.705 },
+  { name: "Ayer Keroh", area: "Ayer Keroh, Melaka", region: "south", lat: 2.27, lng: 102.29 },
+  { name: "Banting", area: "Banting, Selangor", region: "klang", lat: 2.817, lng: 101.501 },
+  { name: "Batu Pahat", area: "Batu Pahat, Johor", region: "south", lat: 1.85, lng: 102.933 },
+  { name: "Citta Mall", area: "Ara Damansara, Selangor", region: "klang", lat: 3.085, lng: 101.595 },
+  { name: "Greenlane", area: "Greenlane, Penang", region: "north", lat: 5.393, lng: 100.308 },
+  { name: "Kota Laksamana", area: "Kota Laksamana, Melaka", region: "south", lat: 2.2, lng: 102.25 },
+  { name: "Kamunting Taiping", area: "Kamunting, Perak", region: "north", lat: 4.943, lng: 100.716 },
+  { name: "Kiara Bay", area: "Mont Kiara, Kuala Lumpur", region: "klang", lat: 3.171, lng: 101.65 },
+  { name: "Kota Damansara", area: "Kota Damansara, Selangor", region: "klang", lat: 3.15, lng: 101.59 },
+  { name: "Anggun City", area: "Rawang, Selangor", region: "klang", lat: 3.322, lng: 101.579 },
+  { name: "Gamuda Cove", area: "Gamuda Cove, Selangor", region: "klang", lat: 2.757, lng: 101.685 },
+  { name: "Hextar Empire City", area: "Damansara Perdana, Selangor", region: "klang", lat: 3.155, lng: 101.607 },
+  { name: "Lotus Seberang Jaya", area: "Seberang Jaya, Penang", region: "north", lat: 5.35, lng: 100.4 },
+  { name: "Mount Austin", area: "Mount Austin, Johor Bahru", region: "south", lat: 1.56, lng: 103.79 },
+  { name: "Mydin Subang", area: "Subang Jaya, Selangor", region: "klang", lat: 3.07, lng: 101.58 },
+  { name: "Bukit Mertajam", area: "Bukit Mertajam, Penang", region: "north", lat: 5.363, lng: 100.459 },
+  { name: "Dpulze", area: "Cyberjaya, Selangor", region: "klang", lat: 2.921, lng: 101.654 },
+  { name: "Lucernce Square", area: "Cyberjaya, Selangor", region: "klang", lat: 2.9, lng: 101.67 },
+  { name: "Batu Pahat Mall", area: "Batu Pahat, Johor", region: "south", lat: 1.838, lng: 102.92 },
+  { name: "Kota Kemuning", area: "Kota Kemuning, Selangor", region: "klang", lat: 3.003, lng: 101.547 },
+  { name: "Shah Alam", area: "Shah Alam, Selangor", region: "klang", lat: 3.073, lng: 101.518 },
+  { name: "Putrajaya", area: "Putrajaya", region: "klang", lat: 2.926, lng: 101.696 },
+  { name: "Nilai", area: "Nilai, Negeri Sembilan", region: "klang", lat: 2.82, lng: 101.797 },
+  { name: "Kajang", area: "Kajang, Selangor", region: "klang", lat: 2.993, lng: 101.787 },
+  { name: "Selayang", area: "Selayang, Selangor", region: "klang", lat: 3.25, lng: 101.65 },
+  { name: "Taiping", area: "Taiping, Perak", region: "north", lat: 4.85, lng: 100.74 },
+  { name: "Ipoh", area: "Ipoh, Perak", region: "north", lat: 4.597, lng: 101.09 },
+  { name: "Jalan Ipoh", area: "Jalan Ipoh, Kuala Lumpur", region: "klang", lat: 3.19, lng: 101.68 },
+  { name: "Sri Gombak", area: "Sri Gombak, Selangor", region: "klang", lat: 3.24, lng: 101.73 },
+  { name: "Setia Alam", area: "Setia Alam, Selangor", region: "klang", lat: 3.11, lng: 101.45 },
+  { name: "Bangi", area: "Bandar Baru Bangi, Selangor", region: "klang", lat: 2.96, lng: 101.78 },
+  { name: "Central I-City", area: "I-City, Shah Alam", region: "klang", lat: 3.065, lng: 101.485 },
+  { name: "Melaka Cheng Baru", area: "Cheng, Melaka", region: "south", lat: 2.24, lng: 102.26 },
+  { name: "Melawati Mall", area: "Taman Melawati, Kuala Lumpur", region: "klang", lat: 3.212, lng: 101.75 },
+  { name: "Prima Saujana", area: "Saujana, Kajang", region: "klang", lat: 2.975, lng: 101.76 },
+  { name: "Puncak Alam", area: "Puncak Alam, Selangor", region: "klang", lat: 3.23, lng: 101.44 },
+  { name: "USJ 21", area: "USJ, Subang Jaya", region: "klang", lat: 3.001, lng: 101.579 },
+  { name: "Sunway Wangsa Walk", area: "Wangsa Maju, Kuala Lumpur", region: "klang", lat: 3.2, lng: 101.735 },
+  { name: "Matahari Sri Manja", area: "Sri Manja, Petaling Jaya", region: "klang", lat: 3.084, lng: 101.642 },
+  { name: "Seksyen 13", area: "Seksyen 13, Shah Alam", region: "klang", lat: 3.093, lng: 101.529 },
+];
+
+export const REGION_LABEL: Record<Region, string> = { klang: "Klang Valley", north: "North", south: "South" };

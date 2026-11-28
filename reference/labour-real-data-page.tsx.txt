@@ -1,0 +1,23 @@
+"use client";
+
+import { useData } from "@/components/data-provider";
+import { PageHeader } from "@/components/page-header";
+import { EmptyNote, Stat } from "@/components/stat-card";
+import { RM2 } from "@/lib/calc";
+
+export default function Labor() {
+  const { cur: d } = useData();
+  const sales = d?.sales ? d.sales.net : null;
+  return (
+    <>
+      <PageHeader title="Labour vs sales" subtitle={d ? `${d.outlet}, ${d.date}. How much of sales goes to labour.` : "How much of sales goes to labour."} />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat label="Net sales" value={sales != null ? RM2(sales) : "—"} sub={d ? "from POS" : "no data"} />
+        <Stat label="Labour cost" value="—" sub="awaiting payroll" />
+        <Stat label="Labour % of sales" value="—" sub="target under 25%" />
+        <Stat label="Sales per labour RM" value="—" sub="efficiency" />
+      </div>
+      <EmptyNote>Upload the labour / payroll report (staff hours and wages) to compute labour % and efficiency.</EmptyNote>
+    </>
+  );
+}
