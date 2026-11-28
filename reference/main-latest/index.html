@@ -600,6 +600,7 @@ svg [data-tip]:hover{opacity:.82}
       <input type="date" class="datein" id="dateIn">
       <span class="rolebadge" id="roleBadge" hidden></span>
       <span class="userchip" id="userChip" hidden></span>
+      <button class="signout" id="syncBtn" title="Reload latest data from cloud" hidden>&#8635; Sync</button>
       <button class="signout" id="signOut" hidden>Sign out</button>
     </div>
   </div>
@@ -968,6 +969,11 @@ document.getElementById('nav').addEventListener('click',e=>{
   document.querySelectorAll('.content > section').forEach(s=>s.hidden=s.id!==b.dataset.s);window.scrollTo({top:0,behavior:'smooth'});});
 document.body.addEventListener('click',e=>{const r=e.target.closest('[data-code]');if(r){openItem(r.dataset.code);return;}const p=e.target.closest('[data-pick]');if(p){curO=p.dataset.pick;curD=datesFor(curO).slice(-1)[0];renderAll();document.querySelector('#nav button[data-s=overview]').click();}});
 document.getElementById('sx').onclick=closeSide;document.getElementById('scrim').onclick=closeSide;
+function syncNow(){if(!sb)return;setCloud('loading');cloudLoad().then(()=>loadRequests());}
+let _lastSync=Date.now();
+{const _sy=document.getElementById('syncBtn');if(_sy)_sy.onclick=()=>{_lastSync=Date.now();syncNow();};
+ const _cp=document.getElementById('cloudPill');if(_cp){_cp.style.cursor='pointer';_cp.title='Click to reload latest data';_cp.onclick=()=>{_lastSync=Date.now();syncNow();};}}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&sb&&booted&&Date.now()-_lastSync>15000){_lastSync=Date.now();syncNow();}});
 (function(){const tip=document.getElementById('chartTip');if(!tip)return;
   document.addEventListener('mouseover',e=>{const t=e.target.closest&&e.target.closest('[data-tip]');if(t){tip.textContent=t.getAttribute('data-tip');tip.hidden=false;}});
   document.addEventListener('mousemove',e=>{if(!tip.hidden){let x=e.clientX+14,y=e.clientY+14;const w=tip.offsetWidth||140;if(x+w>window.innerWidth-8)x=e.clientX-w-14;tip.style.left=x+'px';tip.style.top=y+'px';}});
@@ -1021,7 +1027,7 @@ let authMode='in',booted=false;
 function authErr(m){const e=document.getElementById('authErr');if(m){e.textContent=m;e.hidden=false;}else{e.hidden=true;}}
 function showGate(){gateEl.hidden=false;appEl.hidden=true;}
 function bootApp(){if(booted)return;booted=true;renderAll();if(sb){setCloud('loading');cloudLoad().then(()=>loadRequests());}else{setCloud('off');}}
-async function onAuthed(session){ME=session.user;gateEl.hidden=true;appEl.hidden=false;const uc=document.getElementById('userChip');const _md=session.user.user_metadata||{};uc.textContent=_md.full_name||_md.name||session.user.email;uc.hidden=false;document.getElementById('signOut').hidden=false;ROLE='user';try{if(sb){const {data}=await sb.from('profiles').select('role').eq('id',session.user.id).maybeSingle();if(data&&data.role)ROLE=data.role;}}catch(e){console.error('role',e);}applyRole();bootApp();}
+async function onAuthed(session){ME=session.user;gateEl.hidden=true;appEl.hidden=false;const uc=document.getElementById('userChip');const _md=session.user.user_metadata||{};uc.textContent=_md.full_name||_md.name||session.user.email;uc.hidden=false;document.getElementById('signOut').hidden=false;{const _sy=document.getElementById('syncBtn');if(_sy)_sy.hidden=false;}ROLE='user';try{if(sb){const {data}=await sb.from('profiles').select('role').eq('id',session.user.id).maybeSingle();if(data&&data.role)ROLE=data.role;}}catch(e){console.error('role',e);}applyRole();bootApp();}
 if(sb){
   appEl.hidden=true;
   const btn=document.getElementById('authBtn'),emailI=document.getElementById('authEmail'),passI=document.getElementById('authPass');
