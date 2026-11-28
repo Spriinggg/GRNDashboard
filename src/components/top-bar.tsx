@@ -10,12 +10,12 @@ import { UserMenu } from "@/components/user-menu";
 import { useData } from "@/components/data-provider";
 import { ScopeBar } from "@/components/page-header";
 
-const titles: Record<string, string> = { "/": "Dashboard", "/variance": "Food variance", "/discipline": "Count & GRN", "/outlets": "Outlets", "/upload": "Upload data", "/sales/by-outlet": "Sales by outlet", "/sales/by-channel": "Sales by channel", "/pnl": "Profit & loss", "/labor": "Labour vs sales", "/treeams": "Treeams", "/approvals": "Approvals" };
+const titles: Record<string, string> = { "/": "Dashboard", "/variance": "Food variance", "/variance/day": "Food variance, one day", "/discipline": "Count & GRN", "/outlets": "Outlets", "/upload": "Upload data", "/sales/by-outlet": "Sales by outlet", "/sales/by-channel": "Sales by channel", "/pnl": "Profit & loss", "/labor": "Labour vs sales", "/treeams": "Treeams", "/approvals": "Approvals" };
 
 export function TopBar() {
   const pathname = usePathname();
   const { cur } = useData();
-  const showScope = ["/discipline"].some((p) => pathname.startsWith(p));
+  const showScope = ["/discipline", "/variance/day"].some((p) => pathname.startsWith(p));
   const title = titles[pathname] ?? "US Pizza";
   return (
     <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur md:px-6">

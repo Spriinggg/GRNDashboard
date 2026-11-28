@@ -25,7 +25,7 @@ export function ScopeBar() {
   const names = Object.keys(os);
   const dts = curO ? datesFor(store, curO).slice().reverse() : [];
   return (
-    <div className="flex min-w-0 items-center gap-1.5" role="group" aria-label="Outlet and day">
+    <div className="flex min-w-0 max-w-full items-center gap-1.5 overflow-x-auto" role="group" aria-label="Outlet and day">
       <FilterSelect
         boxed
         label="Outlet"

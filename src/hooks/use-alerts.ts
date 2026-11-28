@@ -18,17 +18,22 @@ const pts = (v: number) => `${Math.abs(v).toFixed(1)} points`;
 // labour, checklists) become real when those reports are loaded. Worked out a moment after the page is shown, so it never
 // holds up the first paint.
 export function useAlerts(): { alerts: Alert[]; scope: string; ready: boolean } {
-  const { store, grnDocs } = useData();
+  const { store, grnDocs, daysByOutlet, ensureRange } = useData();
   const [ready, setReady] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 80);
     return () => clearTimeout(t);
   }, []);
 
+  // The alerts look at the month to date, so make sure those days are loaded.
+  useEffect(() => {
+    void ensureRange(MTD_SPAN);
+  }, [ensureRange]);
+
   const alerts = useMemo<Alert[]>(() => {
     if (!ready) return [];
     const ov = buildOverview(MTD_SPAN, OUTLETS.map((_, o) => o));
-    const outlets = outletRows(store);
+    const outlets = outletRows(store, daysByOutlet);
     const withData = outlets.filter((r) => r.on);
     const crit = withData.filter((r) => r.status === "crit").length;
     const okSet = new Set(withData.map((r) => r.ok));
@@ -43,7 +48,7 @@ export function useAlerts(): { alerts: Alert[]; scope: string; ready: boolean } 
     if (missing) out.push({ key: "days", tone: "warning", title: `${missing} of ${days.length} loaded ${days.length === 1 ? "day has" : "days have"} a missing check`, detail: "Stock count, GRN or POS deductions not found.", href: "/discipline" });
     if (withData.length < outlets.length) out.push({ key: "nodata", tone: "info", title: `${outlets.length - withData.length} of ${outlets.length} outlets have no data yet`, detail: "Upload their files to include them.", href: "/upload" });
     return out;
-  }, [ready, store, grnDocs]);
+  }, [ready, store, grnDocs, daysByOutlet]);
 
   return { alerts, scope: "All outlets, month to date", ready };
 }

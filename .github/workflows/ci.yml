@@ -1,0 +1,113 @@
+name: CI and deploy
+
+# What runs:
+#  - every push to main and every pull request into main: install, type check and a production build ("check").
+#  - after that, a Vercel deploy: a preview for a pull request, production for a push to main ("deploy").
+#
+# The deploy job only runs when the three Vercel secrets exist (see README, "CI and deployment"). Without them, only the check runs,
+# so the workflow is safe to merge before Vercel is connected, and pull requests from forks (which cannot read secrets) still pass.
+#
+# If the Vercel project is also connected to GitHub (Vercel's own Git integration), every push is deployed twice. Use one of the two:
+# keep the Git integration and delete the "deploy" job, or keep this job and turn the Git integration off in the Vercel project.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push to the same branch or pull request cancels the run before it.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  check:
+    name: Type check and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      # The public Supabase values are optional here. Without them the app builds in "local only" mode, which is enough to prove it
+      # compiles. They are the anon key and the URL, which the browser sees anyway, never the service_role key.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+  deploy:
+    name: Deploy to Vercel
+    needs: check
+    # Not for a pull request from a fork, and not for a manual run on another branch.
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Production is one deploy at a time, in order. Previews do not queue behind it.
+    concurrency:
+      group: deploy-${{ github.event_name == 'push' && 'production' || github.ref }}
+      cancel-in-progress: false
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Is Vercel configured?
+        id: cfg
+        run: |
+          if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Vercel secrets are not set, so nothing is deployed. The checks above still ran." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.cfg.outputs.ready == 'true'
+        with:
+          node-version: 22
+
+      # Pin this to the version the team uses once it is chosen, for example vercel@NN.
+      - name: Install the Vercel CLI
+        if: steps.cfg.outputs.ready == 'true'
+        run: npm install --global vercel@latest
+
+      # The environment variables (Supabase URL and anon key) come from the Vercel project, so they are set in one place.
+      - name: Pull project settings
+        if: steps.cfg.outputs.ready == 'true'
+        run: vercel pull --yes --environment=${{ github.event_name == 'push' && 'production' || 'preview' }} --token="$VERCEL_TOKEN"
+
+      - name: Build
+        if: steps.cfg.outputs.ready == 'true'
+        run: vercel build ${{ github.event_name == 'push' && '--prod' || '' }} --token="$VERCEL_TOKEN"
+
+      - name: Deploy
+        if: steps.cfg.outputs.ready == 'true'
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt ${{ github.event_name == 'push' && '--prod' || '' }} --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "### ${{ github.event_name == 'push' && 'Production' || 'Preview' }} deployed" >> "$GITHUB_STEP_SUMMARY"
+          echo "$url" >> "$GITHUB_STEP_SUMMARY"

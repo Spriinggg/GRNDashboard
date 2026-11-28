@@ -2,6 +2,7 @@
 
 import { ArrowLeft, ChevronRight, MousePointerClick } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { DerivationExplorer } from "@/components/derivation-explorer";
 import { DrillChart, fmtDelta, fmtFull } from "@/components/drill-chart";
 import { PageHeader } from "@/components/page-header";
 import { LINE_LEAD, LINE_REST, TrendLines } from "@/components/sales-charts";
@@ -13,8 +14,10 @@ import { Chip, Delta, FilterBar, FilterSearch, Seg } from "@/components/sales-ui
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
-import { IDEAL_FC, LAST_M, MONTHS, OUTLETS, PERIODS, REGION_LABEL, YEAR, dayLong, hourRows, monthRows, networkRows, outletRows, periodOf, trendRows } from "@/lib/overview-mock";
-import type { Level, Metric, PeriodKey, Row } from "@/lib/overview-mock";
+import { DERIVED_LABEL, derivedRatio, deriveRowsFor } from "@/lib/channel-mock";
+import type { Derived } from "@/lib/channel-mock";
+import { IDEAL_FC, LAST_M, MONTHS, OUTLETS, PERIODS, REGION_LABEL, YEAR, dayLong, hourRows, lastDay, monthRows, networkRows, outletRows, periodOf, trendRows } from "@/lib/overview-mock";
+import type { Level, Metric, PeriodKey, Range, Row, TrendPoint } from "@/lib/overview-mock";
 import type { Region } from "@/lib/outlet-locations";
 import { cn } from "@/lib/utils";
 
@@ -55,10 +58,27 @@ const T_VS: { value: TVs; label: string }[] = [
   { value: "above", label: "Above average" },
   { value: "below", label: "Below average" },
 ];
-const MEASURE: { value: Metric; label: string }[] = [
-  { value: "sales", label: "Sales (RM)" },
+// Net sales is the figure used everywhere else (before SST and service charge). The others walk from gross sales to collected sales.
+type Measure = Metric | Derived;
+const MEASURE: { value: Measure; label: string }[] = [
+  { value: "sales", label: "Net sales" },
+  { value: "gross", label: "Gross sales" },
+  { value: "discount", label: "Discount" },
+  { value: "sc", label: "Service charge" },
+  { value: "sst", label: "SST (tax)" },
+  { value: "collected", label: "Collected sales" },
   { value: "pizzas", label: "Pizzas" },
 ];
+
+// A measure other than net sales or pizzas is the net sales row scaled by that outlet's ratio for the same days, so the totals agree
+// with the Sales by channel page. `sort` puts the biggest first again, because the ratios differ a little between outlets.
+function withKind(rows: Row[], kind: Derived | null, ratio: (r: Row) => number, sort = false): Row[] {
+  if (!kind) return rows;
+  const out = rows.map((r) => ({ ...r, value: r.value * ratio(r) }));
+  if (sort) out.sort((a, b) => b.value - a.value);
+  const t = out.reduce((s, r) => s + r.value, 0) || 1;
+  return out.map((r) => ({ ...r, share: r.value / t }));
+}
 
 function Fcost({ v }: { v: number | null }) {
   if (v === null) return <span className="text-muted-foreground">–</span>;
@@ -73,7 +93,7 @@ function Fcost({ v }: { v: number | null }) {
 }
 
 export default function SalesByOutlet() {
-  const [metric, setMetric] = useState<Metric>("sales");
+  const [measure, setMeasure] = useState<Measure>("sales");
   const [period, setPeriod] = useState<PeriodKey>("mtd");
   const [region, setRegion] = useState<"all" | Region>("all");
   const [q, setQ] = useState("");
@@ -89,11 +109,13 @@ export default function SalesByOutlet() {
 
   const level: Level = path.day !== undefined ? "day" : path.month !== undefined ? "month" : path.outlet ? "outlet" : "network";
   const depth = ["network", "outlet", "month", "day"].indexOf(level);
-  const what = metric === "sales" ? "Net sales" : "Pizzas sold";
+  const metric: Metric = measure === "pizzas" ? "pizzas" : "sales";
+  const kind: Derived | null = measure === "sales" || measure === "pizzas" ? null : measure;
+  const what = measure === "pizzas" ? "Pizzas sold" : measure === "sales" ? "Net sales" : DERIVED_LABEL[measure];
   const pd = periodOf(period);
 
   // Every outlet in the region and period, then the filters narrow it.
-  const base = useMemo(() => networkRows(region, period, metric), [region, period, metric]);
+  const base = useMemo(() => withKind(networkRows(region, period, metric), kind, (r) => derivedRatio(r.key, pd.ranges, kind!), true), [region, period, metric, kind, pd]);
   const network = useMemo(() => {
     const avg = base.length ? base.reduce((s, r) => s + r.value, 0) / base.length : 0;
     let r = base.filter((x) => !q || (x.label + " " + (x.sub ?? "")).toLowerCase().includes(q.toLowerCase()));
@@ -108,10 +130,10 @@ export default function SalesByOutlet() {
 
   const rows: Row[] = useMemo(() => {
     if (level === "network") return network;
-    if (level === "outlet") return outletRows(path.outlet!, metric);
-    if (level === "month") return monthRows(path.outlet!, path.month!, metric);
-    return hourRows(path.outlet!, path.month!, path.day!, metric);
-  }, [level, network, metric, path]);
+    if (level === "outlet") return withKind(outletRows(path.outlet!, metric), kind, (r) => derivedRatio(path.outlet!, [[+r.key, 1, lastDay(+r.key)]], kind!));
+    if (level === "month") return withKind(monthRows(path.outlet!, path.month!, metric), kind, (r) => derivedRatio(path.outlet!, [[path.month!, +r.key, +r.key]], kind!));
+    return withKind(hourRows(path.outlet!, path.month!, path.day!, metric), kind, () => derivedRatio(path.outlet!, [[path.month!, path.day!, path.day!]], kind!));
+  }, [level, network, metric, kind, path]);
 
   // Sorting and paging for the breakdown table. Without a sort the rows keep their order (largest first, or in time).
   // The table has its own search and filters, on top of the ones at the head of the page.
@@ -137,7 +159,7 @@ export default function SalesByOutlet() {
   const tableTotal = tableRows.reduce((s, r) => s + r.value, 0);
   const tv = useTableView(tableRows, {
     pageSize: 10,
-    resetKey: `${level}|${path.outlet}|${path.month}|${path.day}|${period}|${region}|${q}|${perf}|${fc}|${metric}|${tq}|${tfc}|${tchange}|${tvs}`,
+    resetKey: `${level}|${path.outlet}|${path.month}|${path.day}|${period}|${region}|${q}|${perf}|${fc}|${measure}|${tq}|${tfc}|${tchange}|${tvs}`,
     sorts: {
       name: (r) => (level === "network" ? r.label : Number(r.key)),
       value: (r) => r.value,
@@ -154,7 +176,35 @@ export default function SalesByOutlet() {
   }, [level]);
 
   const top10 = useMemo(() => network.slice(0, 10), [network]);
-  const trend = useMemo(() => (level === "network" ? trendRows((trendMode === "top" ? top10 : network).map((r) => r.label), metric) : []), [level, trendMode, top10, network, metric]);
+  const trend = useMemo(() => {
+    if (level !== "network") return [];
+    const names = (trendMode === "top" ? top10 : network).map((r) => r.label);
+    const t = trendRows(names, metric);
+    if (!kind) return t;
+    // The same scaling as the rows: each outlet's value for a month times its ratio for that month.
+    return t.map((pt): TrendPoint => {
+      const m = MONTHS.indexOf(pt.label);
+      const next: TrendPoint = { ...pt };
+      let total = 0;
+      for (const nm of names) {
+        const v = pt[nm];
+        if (typeof v === "number") {
+          const scaled = Math.round(v * derivedRatio(nm, [[m, 1, lastDay(m)]], kind));
+          next[nm] = scaled;
+          total += scaled;
+        }
+      }
+      next.total = total;
+      return next;
+    });
+  }, [level, trendMode, top10, network, metric, kind]);
+
+  // From gross sales to net settlement for what the page shows now: the outlets in the list, or the one opened, for the period, the
+  // month or the day. It has the same figures as the Sales by channel page.
+  const dRanges = useMemo<Range[]>(() => (level === "day" ? [[path.month!, path.day!, path.day!]] : level === "month" ? [[path.month!, 1, lastDay(path.month!)]] : pd.ranges), [level, path.month, path.day, pd]);
+  const dNames = useMemo(() => (level === "network" ? network.map((r) => r.label) : [path.outlet!]), [level, network, path.outlet]);
+  const derive = useMemo(() => deriveRowsFor(dNames, dRanges), [dNames, dRanges]);
+  const dScope = level === "network" ? `${region === "all" ? "All outlets" : REGION_LABEL[region]}, ${pd.label}${network.length < base.length ? `, ${network.length} outlets` : ""}` : level === "outlet" ? `${path.outlet}, ${pd.label}` : level === "month" ? `${path.outlet}, ${MONTHS[path.month!]} ${YEAR}` : `${path.outlet}, ${dayLong(path.month!, path.day!)}`;
 
   const reset = () => {
     setPeriod("mtd");
@@ -262,7 +312,7 @@ export default function SalesByOutlet() {
             ))}
           </ol>
         </nav>
-        {level !== "network" ? <FilterSelect boxed label="Measure" value={metric} onChange={setMetric} options={MEASURE} /> : null}
+        {level !== "network" ? <FilterSelect boxed label="Measure" value={measure} onChange={setMeasure} options={MEASURE} /> : null}
       </div>
 
       {level === "network" ? (
@@ -282,7 +332,7 @@ export default function SalesByOutlet() {
           <FilterSelect boxed label="Region" value={region} onChange={(v) => setRegion(v as "all" | Region)} options={[{ value: "all", label: "All regions" }, ...(Object.keys(REGION_LABEL) as Region[]).map((r) => ({ value: r, label: REGION_LABEL[r] }))]} />
           <FilterSelect boxed label="Ranking" value={perf} onChange={setPerf} options={PERF} />
           <FilterSelect boxed label="Food cost" value={fc} onChange={setFc} options={FC} />
-          <FilterSelect boxed label="Measure" value={metric} onChange={setMetric} options={MEASURE} />
+          <FilterSelect boxed label="Measure" value={measure} onChange={setMeasure} options={MEASURE} />
         </FilterBar>
       ) : null}
 
@@ -346,7 +396,7 @@ export default function SalesByOutlet() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold">{trendMode === "top" ? "Top 10 outlets through the year" : "All selected outlets through the year"}</h2>
-                <p className="text-xs text-muted-foreground">Average {metric === "sales" ? "sales" : "pizzas"} per day in each month, January to {MONTHS[LAST_M]}. A part month is not drawn as a drop.</p>
+                <p className="text-xs text-muted-foreground">Average {what.toLowerCase()} per day in each month, January to {MONTHS[LAST_M]}. A part month is not drawn as a drop.</p>
               </div>
               <Seg<"top" | "total"> label="Lines" value={trendMode} onChange={setTrendMode} options={[{ value: "top", label: "Top 10" }, { value: "total", label: "Total" }]} />
             </div>
@@ -390,6 +440,10 @@ export default function SalesByOutlet() {
           ) : null}
         </Card>
       ) : null}
+
+      <Card className="gap-0 p-0 shadow-sm">
+        <DerivationExplorer rows={derive} scope={dScope} />
+      </Card>
 
       <Card className="gap-0 p-0 shadow-sm">
         {level === "network" ? (
@@ -440,7 +494,7 @@ export default function SalesByOutlet() {
             <TableHeader>
               <TableRow>
                 <SortHead label={NOUN[level][0].toUpperCase() + NOUN[level].slice(1)} sortKey="name" sort={tv.sort} onSort={tv.toggleSort} className="text-left" />
-                <SortHead label={metric === "sales" ? "Sales" : "Pizzas"} sortKey="value" sort={tv.sort} onSort={tv.toggleSort} className="text-right" />
+                <SortHead label={measure === "pizzas" ? "Pizzas" : what} sortKey="value" sort={tv.sort} onSort={tv.toggleSort} className="text-right" />
                 <SortHead label="Share" sortKey="share" sort={tv.sort} onSort={tv.toggleSort} className="hidden w-[22%] md:table-cell" />
                 {hasDelta ? <SortHead label="Change" sortKey="delta" sort={tv.sort} onSort={tv.toggleSort} className="text-right" /> : null}
                 {hasFc ? <SortHead label="Food cost" sortKey="fc" sort={tv.sort} onSort={tv.toggleSort} className="text-right" /> : null}

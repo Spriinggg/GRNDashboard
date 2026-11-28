@@ -27,7 +27,7 @@ import { useData } from "@/components/data-provider";
 import { useAuth } from "@/components/auth-provider";
 import { statusOf } from "@/lib/calc";
 
-type Child = { label: string; href: string; icon?: LucideIcon };
+type Child = { label: string; href: string; icon?: LucideIcon; badge?: number };
 type Item = { label: string; icon: LucideIcon; href: string; badge?: number; children?: Child[] };
 type Group = { label?: string; items: Item[] };
 
@@ -58,7 +58,15 @@ export function AppSidebar() {
     {
       label: "Food control",
       items: [
-        { label: "Food variance", icon: Scale, href: "/variance", badge: flagged || undefined },
+        {
+          label: "Food variance",
+          icon: Scale,
+          href: "/variance",
+          children: [
+            { label: "All outlets", href: "/variance" },
+            { label: "One outlet and day", href: "/variance/day", badge: flagged || undefined },
+          ],
+        },
         { label: "Count & GRN", icon: ClipboardCheck, href: "/discipline" },
         { label: "Labour vs sales", icon: Clock, href: "/labor" },
       ],
@@ -113,6 +121,7 @@ export function AppSidebar() {
                                 <SidebarMenuSubItem key={c.href}>
                                   <SidebarMenuSubButton isActive={on} aria-current={on ? "page" : undefined} render={<Link href={c.href} onClick={() => setOpenMobile(false)} />}>
                                     <span>{c.label}</span>
+                                    {c.badge ? <span className="ml-auto text-xs tabular-nums text-muted-foreground">{c.badge}</span> : null}
                                   </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                               );

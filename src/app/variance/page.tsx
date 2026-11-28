@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { fmtDelta } from "@/components/drill-chart";
 import { FilterSelect } from "@/components/filter-select";
@@ -207,6 +208,13 @@ export default function FoodVariance() {
           </>
         }
       />
+      <p className="-mt-3 text-sm text-muted-foreground">
+        Looking for the real count of one outlet and one day, item by item? Open{" "}
+        <Link href="/variance/day" className="font-medium text-primary underline-offset-2 hover:underline">
+          One outlet and day
+        </Link>
+        .
+      </p>
 
       <FilterBar
         active={[

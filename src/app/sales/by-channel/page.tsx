@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { ChannelDonut, ChannelLogo } from "@/components/channel-parts";
 import { OutletChannelDrill } from "@/components/outlet-channel-drill";
 import { fmtDelta, fmtFull } from "@/components/drill-chart";
-import { FeeExplorer } from "@/components/fee-breakdown";
+import { DerivationExplorer } from "@/components/derivation-explorer";
 import { FilterSelect } from "@/components/filter-select";
 import { Kpis } from "@/components/kpi-strip";
 import { PageHeader } from "@/components/page-header";
@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { useTableView } from "@/hooks/use-table-view";
-import { CHANNELS, CHANNEL_KEYS, channelDays, channelTrend, channelView } from "@/lib/channel-mock";
+import { CHANNELS, CHANNEL_KEYS, channelDays, channelTrend, channelView, feesOf, settlementOf } from "@/lib/channel-mock";
 import type { ChannelKey } from "@/lib/channel-mock";
 import { LAST_M, MONTHS, PERIODS, REGION_LABEL, YEAR, periodOf } from "@/lib/overview-mock";
 import type { Metric, PeriodKey } from "@/lib/overview-mock";
@@ -80,10 +80,9 @@ export default function SalesByChannel() {
   const topCh = sorted[0];
   const pct = (v: number) => (total ? Math.round((v / total) * 100) : 0);
 
-  // Channels that carry fees: the delivery platforms and the payment gateway of the app.
-  const fees = view.fees.filter((f) => sel.includes(f.key) && f.sales > 0);
-  const feeRM = fees.reduce((s, f) => s + f.commission + f.ads + f.service + f.gateway + f.adjust, 0);
-  const feeSales = fees.reduce((s, f) => s + f.sales, 0);
+  // From gross sales to net settlement for the selected channels. Always in ringgit, whatever the Measure is.
+  const derive = view.derive.filter((d) => sel.includes(d.key) && d.gross > 0);
+  const dTot = derive.reduce((a, d) => ({ gross: a.gross + d.gross, net: a.net + d.net, sc: a.sc + d.sc, sst: a.sst + d.sst, fees: a.fees + feesOf(d), settle: a.settle + settlementOf(d) }), { gross: 0, net: 0, sc: 0, sst: 0, fees: 0, settle: 0 });
 
   // Largest outlet first until a person sorts by a column. Ten outlets a page.
   const ranked = useMemo(() => [...view.rows].sort((a, b) => rowTotal(b.vals) - rowTotal(a.vals)), [view, sel]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -215,7 +214,7 @@ export default function SalesByChannel() {
             { key: "total", count: fmtFull(metric, total), label: `${what.toLowerCase()}${vsText}`, note: `${what}, ${region === "all" ? "all outlets" : REGION_LABEL[region]}, ${pd.label}. ${view.rows.length} outlets.` },
             { key: "deliv", count: platforms.length && total ? `${pct(deliv)}%` : "–", label: "from delivery platforms", note: platforms.length ? `${platforms.map((c) => c.short).join(", ")}: ${fmtFull(metric, deliv)}.` : "No delivery platform is selected." },
             { key: "top", count: topCh ? topCh.label : "–", visual: topCh ? <><ChannelLogo channel={topCh} size="kpi" showName={false} /><span className="text-lg leading-none font-semibold">{topCh.label}</span></> : undefined, label: topCh ? `biggest channel · ${pct(view.totals[topCh.key])}%` : "biggest channel", note: topCh ? `${topCh.label}: ${fmtFull(metric, view.totals[topCh.key])}.` : "No channel is selected." },
-            { key: "fees", count: feeSales ? fmtFull("sales", feeRM) : "–", label: feeSales ? `fees and charges · ${((feeRM / feeSales) * 100).toFixed(1)}% of their sales` : "fees and charges", note: "Commission, advertising, service fees, payment gateway and adjustments on the selected channels." },
+            { key: "settle", count: dTot.gross ? fmtFull("sales", dTot.settle) : "–", label: dTot.gross ? `net settlement · ${((dTot.settle / dTot.gross) * 100).toFixed(1)}% of gross kept` : "net settlement", note: dTot.gross ? `Net sales ${fmtFull("sales", dTot.net)} plus service charge ${fmtFull("sales", dTot.sc)} and SST ${fmtFull("sales", dTot.sst)}, less ${fmtFull("sales", dTot.fees)} of commission, advertising, service fees and adjustments, on the selected channels.` : "No channel is selected." },
           ]}
         />
       </section>
@@ -268,14 +267,7 @@ export default function SalesByChannel() {
       </Card>
 
       <Card className="gap-0 p-0 shadow-sm">
-        {fees.length ? (
-          <FeeExplorer fees={fees} />
-        ) : (
-          <div className="p-6">
-            <h2 className="text-base font-semibold">What the platforms take</h2>
-            <p className="py-6 text-center text-sm text-muted-foreground">Select GrabFood, ShopeeFood, FoodPanda or the US Pizza app to see their fees.</p>
-          </div>
-        )}
+        <DerivationExplorer rows={derive} scope={`${region === "all" ? "All outlets" : REGION_LABEL[region]}, ${pd.label}`} />
       </Card>
 
       <Card className="gap-0 p-0 shadow-sm">

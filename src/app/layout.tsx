@@ -7,6 +7,8 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { DataProvider } from "@/components/data-provider";
 import { ItemSheet } from "@/components/item-sheet";
 import { SiteFooter } from "@/components/site-footer";
+import { SystemNotices } from "@/components/system-notices";
+import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TopBar } from "@/components/top-bar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -38,6 +40,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <ItemSheet />
           </DataProvider>
           </AuthProvider>
+          <Toaster />
+          <SystemNotices />
         </ThemeProvider>
       </body>
     </html>

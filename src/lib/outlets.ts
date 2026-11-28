@@ -20,7 +20,9 @@ export type OutletRow = {
 };
 
 // One row for each of the 44 HQ outlets, with the figures of its latest loaded day.
-export function outletRows(store: Store): OutletRow[] {
+// `daysSaved` is how many days each outlet has saved in Supabase (by outlet key). Not every day is loaded at once, so the count of
+// days cannot come from the loaded days alone.
+export function outletRows(store: Store, daysSaved?: Record<string, number>): OutletRow[] {
   const os = outletsOf(store);
   const keys = Object.keys(os);
   return outletLocations.map((l) => {
@@ -35,7 +37,7 @@ export function outletRows(store: Store): OutletRow[] {
     return {
       ...base,
       on: true,
-      days: os[k].dates.length,
+      days: Math.max(os[k].dates.length, daysSaved?.[k] ?? 0),
       last,
       total: totVar(d),
       flagged: items.filter((i) => statusOf(i)[0] !== "good").length,

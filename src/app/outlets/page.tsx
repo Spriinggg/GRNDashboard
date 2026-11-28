@@ -24,7 +24,7 @@ const ST_LABEL: Record<string, string> = { all: "All", crit: "Critical", warn: "
 const ST_RANK: Record<OutletStatus, number> = { crit: 0, warn: 1, good: 2, none: 3 };
 
 export default function Outlets() {
-  const { store } = useData();
+  const { store, daysByOutlet } = useData();
   const [query, setQuery] = useState("");
   const [st, setSt] = useState("all");
   const [region, setRegion] = useState("all");
@@ -33,7 +33,7 @@ export default function Outlets() {
   // The outlet whose card is open. A pin or a row opens it, and Escape closes it.
   const [cardName, setCardName] = useState<string | null>(null);
 
-  const all = useMemo(() => outletRows(store), [store]);
+  const all = useMemo(() => outletRows(store, daysByOutlet), [store, daysByOutlet]);
   const pins: MapPin[] = all.map((r) => ({
     name: r.name,
     lat: r.lat,

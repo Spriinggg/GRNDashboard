@@ -1,4 +1,5 @@
-// SAMPLE DATA for the Sales by channel design. Nothing here comes from Supabase, POS or the delivery apps.
+// SAMPLE DATA for the Sales by channel design. Nothing here comes from Supabase, POS or the delivery apps. The rates are set from
+// the September 2026 dashboard, but every figure is still generated.
 // Built on the same outlets and daily sales as overview-mock.ts, then split into channels with fixed rules,
 // so every outlet and period shows the same numbers each time. Replace the builders with queries later.
 import { DOW, LAST_M, MONTHS, OUTLETS, YEAR, lastDay, periodOf, rnd, sumDays } from "@/lib/overview-mock";
@@ -6,17 +7,20 @@ import type { Metric, PeriodKey, Range } from "@/lib/overview-mock";
 import type { Region } from "@/lib/outlet-locations";
 
 export type ChannelKey = "walkin" | "app" | "grab" | "shopee" | "panda";
-export type Channel = { key: ChannelKey; label: string; short: string; logo: string; named: boolean; color: string; aov: number; platform: boolean; share: number; growth: number; commission: number; ads: number; service: number; gateway: number; adjust: number };
+export type Channel = { key: ChannelKey; label: string; short: string; logo: string; named: boolean; color: string; aov: number; platform: boolean; share: number; growth: number; commission: number; ads: number; service: number; gateway: number; adjust: number; disc: number; scRate: number; sstRate: number };
 
-// share: typical part of sales. growth: how the share drifts through the year. Fee rates are a share of the channel's own sales:
-// commission, advertising and service fee for the delivery platforms, payment gateway for the US Pizza app, and small
-// adjustments or credits. These rates are made up for the design.
+// share: typical part of sales. growth: how the share drifts through the year.
+// Fee rates are a share of the channel's own net sales: commission, advertising, platform or service fee, payment gateway and
+// adjustments or credits. disc is the discount as a share of GROSS sales. scRate (service charge) and sstRate (SST) are a share
+// of NET sales. All of these rates are set from the September 2026 sales dashboard, so the sample figures have the same shape as
+// the real ones: Grab keeps about 52% of gross, FoodPanda 56%, Shopee 69%. Only POS and the app carry a service charge (dine-in).
+// The US Pizza app has no fee data in the September export, so its gateway rate is 0. Replace with real figures later.
 export const CHANNELS: Channel[] = [
-  { key: "walkin", label: "POS (Zeoniq)", short: "POS", logo: "/logos/zeoniq.png", named: true, color: "var(--muted-foreground)", aov: 22, platform: false, share: 0.52, growth: -0.006, commission: 0, ads: 0, service: 0, gateway: 0, adjust: 0 },
-  { key: "app", label: "US Pizza App", short: "App", logo: "/logo.svg", named: false, color: "var(--primary)", aov: 31, platform: false, share: 0.08, growth: 0.03, commission: 0, ads: 0, service: 0, gateway: 0.015, adjust: 0 },
-  { key: "grab", label: "GrabFood", short: "Grab", logo: "/logos/grab.svg", named: true, color: "#2f9e44", aov: 36, platform: true, share: 0.18, growth: 0.012, commission: 0.25, ads: 0.04, service: 0.02, gateway: 0, adjust: 0.005 },
-  { key: "shopee", label: "ShopeeFood", short: "Shopee", logo: "/logos/shopee.svg", named: true, color: "#f08c00", aov: 34, platform: true, share: 0.12, growth: 0.015, commission: 0.2, ads: 0.05, service: 0.03, gateway: 0, adjust: 0.004 },
-  { key: "panda", label: "FoodPanda", short: "Panda", logo: "/logos/foodpanda.svg", named: true, color: "#e64980", aov: 37, platform: true, share: 0.1, growth: 0.008, commission: 0.27, ads: 0.06, service: 0.02, gateway: 0, adjust: 0.008 },
+  { key: "walkin", label: "POS (Zeoniq)", short: "POS", logo: "/logos/zeoniq.png", named: true, color: "var(--muted-foreground)", aov: 22, platform: false, share: 0.52, growth: -0.006, commission: 0, ads: 0, service: 0, gateway: 0, adjust: 0, disc: 0.229, scRate: 0.0103, sstRate: 0.0598 },
+  { key: "app", label: "US Pizza App", short: "App", logo: "/logo.svg", named: false, color: "var(--primary)", aov: 31, platform: false, share: 0.08, growth: 0.03, commission: 0, ads: 0, service: 0, gateway: 0, adjust: 0, disc: 0.062, scRate: 0.0262, sstRate: 0.0588 },
+  { key: "grab", label: "GrabFood", short: "Grab", logo: "/logos/grab.svg", named: true, color: "#2f9e44", aov: 36, platform: true, share: 0.18, growth: 0.012, commission: 0.311, ads: 0.092, service: 0.013, gateway: 0, adjust: 0.002, disc: 0.1865, scRate: 0, sstRate: 0.0599 },
+  { key: "shopee", label: "ShopeeFood", short: "Shopee", logo: "/logos/shopee.svg", named: true, color: "#f08c00", aov: 34, platform: true, share: 0.12, growth: 0.015, commission: 0.047, ads: 0, service: 0, gateway: 0, adjust: 0, disc: 0.316, scRate: 0, sstRate: 0.0596 },
+  { key: "panda", label: "FoodPanda", short: "Panda", logo: "/logos/foodpanda.svg", named: true, color: "#e64980", aov: 37, platform: true, share: 0.1, growth: 0.008, commission: 0.189, ads: 0.113, service: 0.005, gateway: 0, adjust: 0.018, disc: 0.226, scRate: 0, sstRate: 0.0531 },
 ];
 export const CHANNEL_KEYS = CHANNELS.map((c) => c.key);
 
@@ -39,12 +43,22 @@ const conv = (c: Channel, metric: Metric, sales: number) => (metric === "sales" 
 
 export type ChannelRow = { name: string; area: string; region: Region; vals: Vals; total: number };
 export type FeeRow = { key: ChannelKey; sales: number; commission: number; ads: number; service: number; gateway: number; adjust: number };
-export type ChannelView = { rows: ChannelRow[]; totals: Vals; prevTotals: Vals | null; fees: FeeRow[] };
+export type ChannelView = { rows: ChannelRow[]; totals: Vals; prevTotals: Vals | null; fees: FeeRow[]; derive: DeriveRow[] };
 
 // An empty fee record for every channel that carries fees (the delivery platforms and the payment gateway of the app).
 const newFees = () => Object.fromEntries(CHANNELS.filter((c) => c.commission + c.ads + c.service + c.gateway + c.adjust > 0).map((c) => [c.key, { key: c.key, sales: 0, commission: 0, ads: 0, service: 0, gateway: 0, adjust: 0 }])) as Record<ChannelKey, FeeRow>;
 
-function over(name: string, ranges: Range[], metric: Metric, fee?: Record<ChannelKey, FeeRow>): Vals {
+// From net sales down to settlement, for one channel: gross, discount, net, service charge and SST. Fees are kept apart (FeeRow).
+export type Deriv = { gross: number; discount: number; net: number; sc: number; sst: number };
+export type DeriveRow = Deriv & { key: ChannelKey; commission: number; ads: number; service: number; gateway: number; adjust: number };
+const newDeriv = () => Object.fromEntries(CHANNELS.map((c) => [c.key, { gross: 0, discount: 0, net: 0, sc: 0, sst: 0 }])) as Record<ChannelKey, Deriv>;
+
+export const collectedOf = (d: Deriv) => d.net + d.sc + d.sst; // what the customers paid: net sales plus service charge and SST
+export const feesOf = (r: Pick<DeriveRow, "commission" | "ads" | "service" | "gateway" | "adjust">) => r.commission + r.ads + r.service + r.gateway + r.adjust;
+export const settlementOf = (r: DeriveRow) => collectedOf(r) - feesOf(r); // what is left after the platforms take their fees
+export const keptOf = (r: DeriveRow) => (r.gross ? settlementOf(r) / r.gross : 0); // of every ringgit of gross sales, how much is kept
+
+function over(name: string, ranges: Range[], metric: Metric, fee?: Record<ChannelKey, FeeRow>, dv?: Record<ChannelKey, Deriv>): Vals {
   const o = OUTLETS.find((x) => x.name === name)!;
   const out = zero();
   for (const [m, a, b] of ranges) {
@@ -57,6 +71,16 @@ function over(name: string, ranges: Range[], metric: Metric, fee?: Record<Channe
     for (const c of CHANNELS) {
       const sales = part[c.key];
       out[c.key] += conv(c, metric, sales);
+      if (dv) {
+        const k = `${name}${c.key}${m}`;
+        const gross = sales / (1 - c.disc * (0.92 + rnd("dr" + k) * 0.16));
+        const x = dv[c.key];
+        x.gross += gross;
+        x.discount += gross - sales;
+        x.net += sales;
+        x.sc += sales * c.scRate * (0.9 + rnd("sc" + k) * 0.2);
+        x.sst += sales * c.sstRate * (0.97 + rnd("st" + k) * 0.06);
+      }
       if (fee && fee[c.key]) {
         const f = fee[c.key];
         f.sales += sales;
@@ -76,13 +100,14 @@ export function channelView(region: "all" | Region, period: PeriodKey, metric: M
   const needle = q.trim().toLowerCase();
   const p = periodOf(period);
   const fee = newFees();
+  const dv = newDeriv();
   const totals = zero();
   const prevTotals = p.prev ? zero() : null;
   const rows: ChannelRow[] = [];
   for (const o of OUTLETS) {
     if (region !== "all" && o.region !== region) continue;
     if (needle && !(o.name + " " + o.area).toLowerCase().includes(needle)) continue;
-    const vals = over(o.name, p.ranges, metric, fee);
+    const vals = over(o.name, p.ranges, metric, fee, dv);
     const total = CHANNEL_KEYS.reduce((s, k) => s + vals[k], 0);
     if (!total) continue;
     rows.push({ name: o.name, area: o.area, region: o.region, vals, total });
@@ -92,7 +117,7 @@ export function channelView(region: "all" | Region, period: PeriodKey, metric: M
       for (const k of CHANNEL_KEYS) prevTotals[k] += pv[k];
     }
   }
-  return { rows, totals, prevTotals, fees: Object.values(fee) };
+  return { rows, totals, prevTotals, fees: Object.values(fee), derive: toDeriveRows(dv, fee) };
 }
 
 export type ChannelTrendPoint = { id: string; label: string; sub?: string } & Partial<Record<ChannelKey, number>>;
@@ -159,4 +184,47 @@ export function channelFeesFor(name: string, ranges: Range[]): { vals: Record<Ch
   const fee = newFees();
   const vals = over(name, ranges, "sales", fee);
   return { vals, fee };
+}
+
+const toDeriveRows = (dv: Record<ChannelKey, Deriv>, fee: Record<ChannelKey, FeeRow>): DeriveRow[] =>
+  CHANNELS.map((c) => {
+    const f = fee[c.key];
+    return { key: c.key, ...dv[c.key], commission: f?.commission ?? 0, ads: f?.ads ?? 0, service: f?.service ?? 0, gateway: f?.gateway ?? 0, adjust: f?.adjust ?? 0 };
+  });
+
+// The derivation by channel for some outlets over some days: the same figures as the Sales by channel page.
+export function deriveRowsFor(names: string[], ranges: Range[]): DeriveRow[] {
+  const dv = newDeriv();
+  const fee = newFees();
+  for (const n of names) over(n, ranges, "sales", fee, dv);
+  return toDeriveRows(dv, fee);
+}
+
+const outletCache = new Map<string, Deriv>();
+// All channels of one outlet added up. Remembered, because a page asks for it once for every row it draws.
+export function deriveOutlet(name: string, ranges: Range[]): Deriv {
+  const key = name + JSON.stringify(ranges);
+  const hit = outletCache.get(key);
+  if (hit) return hit;
+  const dv = newDeriv();
+  over(name, ranges, "sales", undefined, dv);
+  const t: Deriv = { gross: 0, discount: 0, net: 0, sc: 0, sst: 0 };
+  for (const d of Object.values(dv)) {
+    t.gross += d.gross;
+    t.discount += d.discount;
+    t.net += d.net;
+    t.sc += d.sc;
+    t.sst += d.sst;
+  }
+  outletCache.set(key, t);
+  return t;
+}
+
+export type Derived = "gross" | "discount" | "sc" | "sst" | "collected";
+export const DERIVED_LABEL: Record<Derived, string> = { gross: "Gross sales", discount: "Discount", sc: "Service charge", sst: "SST (tax)", collected: "Collected sales" };
+// A derived measure of one outlet over some days, as a multiple of its net sales. Sales by outlet scales its net sales rows by this.
+export function derivedRatio(name: string, ranges: Range[], kind: Derived): number {
+  const d = deriveOutlet(name, ranges);
+  if (!d.net) return 0;
+  return (kind === "gross" ? d.gross : kind === "discount" ? d.discount : kind === "sc" ? d.sc : kind === "sst" ? d.sst : collectedOf(d)) / d.net;
 }

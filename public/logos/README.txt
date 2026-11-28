@@ -1,9 +1,11 @@
-Channel logos for the Sales by channel page.
+Channel logos for the Sales by channel page, and the system logos on the Upload data page.
 
   grab.svg        GrabFood. Wikimedia Commons "Grab Logo.svg" (downloaded 27 Nov 2026)
   shopee.svg      ShopeeFood. Wikimedia Commons "Shopee.svg" (the Shopee wordmark, there is no separate ShopeeFood file)
   foodpanda.svg   FoodPanda. Wikimedia Commons "Foodpanda wordmark.svg"
   zeoniq.png      Zeoniq POS (the POS channel). Supplied by the project owner, background removed and trimmed.
+  codemax.png     Codemax (stock count, stock movement and GRN files). Supplied by the project owner, trimmed.
+  treeams.png     TreeAMS (checklist files). Supplied by the project owner, white background removed and trimmed.
 
 The US Pizza app uses ../logo.svg.
 

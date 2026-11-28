@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChannelLogo } from "@/components/channel-parts";
 import { OverviewCard, PresetGroup, Segmented } from "@/components/dashboard-parts";
 import type { Change, Preset } from "@/components/dashboard-parts";
@@ -57,7 +57,7 @@ const METRIC_LEGEND: Record<MapMetric, { figure: string; hot: string }> = {
 };
 
 export default function Dashboard() {
-  const { store, grnDocs } = useData();
+  const { store, grnDocs, daysByOutlet, ensureRange } = useData();
   const router = useRouter();
   const go = (href: string) => () => router.push(href);
   const [span, setSpan] = useState<DateSpan>(MTD);
@@ -69,6 +69,10 @@ export default function Dashboard() {
   const [metric, setMetric] = useState<MapMetric>("sales");
   const needle = q.trim().toLowerCase();
   const prev = previousSpan(span);
+  // The real-file cards (Count & GRN, Uploads) read the days in these dates, so make sure they are loaded.
+  useEffect(() => {
+    void ensureRange(span);
+  }, [ensureRange, span]);
   const label = PRESETS.find((p) => p.span.from === span.from && p.span.to === span.to)?.label;
 
   // The outlets the search and region let through, then the one picked on the map if there is one.
@@ -79,7 +83,7 @@ export default function Dashboard() {
   const metrics = useMemo(() => outletMetrics(span), [span]);
 
   // Real files: Count & GRN, Outlets and Uploads. Outlets use the latest loaded day, the other two the dates chosen.
-  const outlets = useMemo(() => outletRows(store).filter((r) => poolNames.has(r.name.toLowerCase())), [store, poolNames]);
+  const outlets = useMemo(() => outletRows(store, daysByOutlet).filter((r) => poolNames.has(r.name.toLowerCase())), [store, daysByOutlet, poolNames]);
   const okSet = useMemo(() => new Set(outlets.filter((r) => r.on).map((r) => r.ok)), [outlets]);
   const days = useMemo(() => dayRows(store, grnDocs).filter((r) => okSet.has(r.ok) && r.iso >= span.from && r.iso <= span.to), [store, grnDocs, okSet, span]);
   const withData = outlets.filter((r) => r.on);
