@@ -1,22 +1,21 @@
 "use client";
 
-import { AlertTriangle, CircleAlert, CircleCheck, CircleSlash, Search, X } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { Search, X } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import { useData } from "@/components/data-provider";
 import { FilterSelect } from "@/components/filter-select";
 import { Kpis } from "@/components/kpi-strip";
 import { OutletMap } from "@/components/outlet-map";
+import { OutletSheet, OutletState } from "@/components/outlet-sheet";
 import type { MapPin } from "@/lib/outlet-pins";
 import { PageHeader } from "@/components/page-header";
-import { StatusIndicator } from "@/components/status-indicator";
 import { SortHead, TablePagination } from "@/components/table-parts";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { useTableView } from "@/hooks/use-table-view";
-import { RM, fmtD } from "@/lib/calc";
+import { RM, fmtD, signTone } from "@/lib/calc";
 import { REGION_LABEL } from "@/lib/outlet-locations";
 import { outletRows, type OutletRow, type OutletStatus } from "@/lib/outlets";
 import { cn } from "@/lib/utils";
@@ -24,39 +23,15 @@ import { cn } from "@/lib/utils";
 const ST_LABEL: Record<string, string> = { all: "All", crit: "Critical", warn: "Short", good: "On target", none: "No data yet" };
 const ST_RANK: Record<OutletStatus, number> = { crit: 0, warn: 1, good: 2, none: 3 };
 
-function OutletState({ s }: { s: OutletStatus }) {
-  if (s === "crit")
-    return (
-      <StatusIndicator icon={AlertTriangle} tone="danger">
-        Critical
-      </StatusIndicator>
-    );
-  if (s === "warn")
-    return (
-      <StatusIndicator icon={CircleAlert} tone="warning">
-        Short
-      </StatusIndicator>
-    );
-  if (s === "good")
-    return (
-      <StatusIndicator icon={CircleCheck} tone="success">
-        On target
-      </StatusIndicator>
-    );
-  return (
-    <StatusIndicator icon={CircleSlash} tone="muted">
-      No data yet
-    </StatusIndicator>
-  );
-}
-
 export default function Outlets() {
-  const { store, setOutlet } = useData();
-  const router = useRouter();
+  const { store } = useData();
   const [query, setQuery] = useState("");
   const [st, setSt] = useState("all");
   const [region, setRegion] = useState("all");
   const [picked, setPicked] = useState("all");
+  const clearPick = useCallback(() => setPicked("all"), []);
+  // The outlet whose card is open. A pin or a row opens it, and Escape closes it.
+  const [cardName, setCardName] = useState<string | null>(null);
 
   const all = useMemo(() => outletRows(store), [store]);
   const pins: MapPin[] = all.map((r) => ({
@@ -94,11 +69,7 @@ export default function Outlets() {
     setPicked("all");
     setQuery("");
   };
-  const open = (r: OutletRow) => {
-    if (!r.on) return;
-    setOutlet(r.ok);
-    router.push("/");
-  };
+  const open = (r: OutletRow) => setCardName(r.name);
   const showView = (s: string) => {
     setSt((cur) => (cur === s ? "all" : s));
     setPicked("all");
@@ -125,14 +96,18 @@ export default function Outlets() {
             <OutletMap
               pins={pins}
               selected={picked === "all" ? "" : picked}
-              onSelect={(name) => setPicked((p) => (p === name ? "all" : name))}
+              onSelect={(name) => {
+                setPicked((p) => (p === name ? "all" : name));
+                if (name !== picked) setCardName(name);
+              }}
+              onClear={clearPick}
               legend={[
                 { label: "Figure: food variance of the latest day", swatch: "figure" },
                 { label: "Has a critical item", swatch: "hot" },
                 { label: "No data yet", swatch: "empty" },
                 { label: "Selected outlet", swatch: "selected" },
               ]}
-              help="Click an outlet to filter the list, click it again to show all."
+              help="Click an outlet to open its card and filter the list, click it again to show all."
             />
           </div>
         </div>
@@ -196,30 +171,26 @@ export default function Outlets() {
             </TableHeader>
             <TableBody>
               {view.rows.map((r) => (
-                <TableRow key={r.name} className={cn(r.on && "cursor-pointer")} onClick={() => open(r)}>
+                <TableRow key={r.name} className="cursor-pointer" onClick={() => open(r)}>
                   <TableCell className="pl-3">
-                    {r.on ? (
-                      <button
-                        type="button"
-                        aria-label={`Open ${r.name}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          open(r);
-                        }}
-                        className="rounded font-bold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        {r.name}
-                      </button>
-                    ) : (
-                      <span className="font-bold text-muted-foreground">{r.name}</span>
-                    )}
+                    <button
+                      type="button"
+                      aria-label={`Open ${r.name}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        open(r);
+                      }}
+                      className={cn("rounded font-bold outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring", !r.on && "text-muted-foreground")}
+                    >
+                      {r.name}
+                    </button>
                     <span className="block text-xs text-muted-foreground">{r.area}</span>
                   </TableCell>
                   <TableCell className="text-center">{REGION_LABEL[r.region]}</TableCell>
                   <TableCell className="text-center tabular-nums">{r.on ? r.days : "None"}</TableCell>
                   <TableCell className="text-center tabular-nums">{r.last ? fmtD(r.last) : "None"}</TableCell>
                   <TableCell className="text-center tabular-nums">{r.on ? r.flagged : "None"}</TableCell>
-                  <TableCell className={cn("text-right font-bold tabular-nums", r.on && r.total <= -10 && "text-danger")}>{r.on ? RM(r.total) : "None"}</TableCell>
+                  <TableCell className={cn("text-right font-bold tabular-nums", r.on && signTone(r.total))}>{r.on ? RM(r.total) : "None"}</TableCell>
                   <TableCell className="text-center">
                     <OutletState s={r.status} />
                   </TableCell>
@@ -236,8 +207,9 @@ export default function Outlets() {
             </div>
           ) : null}
         </div>
-        <TablePagination view={view} noun="outlets" note="Select an outlet with data to open its dashboard." />
+        <TablePagination view={view} noun="outlets" note="Select an outlet to open its card." />
       </Card>
+      <OutletSheet row={all.find((r) => r.name === cardName) ?? null} onClose={() => setCardName(null)} />
     </>
   );
 }

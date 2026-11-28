@@ -2,7 +2,7 @@
 
 import { Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useData } from "@/components/data-provider";
 import { DateRangeFilter } from "@/components/date-range-filter";
 import { FilterSelect } from "@/components/filter-select";
@@ -17,7 +17,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { useTableView } from "@/hooks/use-table-view";
-import { RM, dKey, fmtD, norm } from "@/lib/calc";
+import { RM, dKey, fmtD, norm, signTone } from "@/lib/calc";
 import { dayRows } from "@/lib/checks";
 import { NO_SPAN, fromIso, inSpan, isOpen, spanText, type DateSpan } from "@/lib/date-span";
 import { outletLocations } from "@/lib/outlet-locations";
@@ -33,6 +33,7 @@ export default function Discipline() {
   const [show, setShow] = useState("all");
   const [span, setSpan] = useState<DateSpan>(NO_SPAN);
   const [picked, setPicked] = useState("all"); // an outlet name from the map, or "all"
+  const clearPick = useCallback(() => setPicked("all"), []);
 
   const rows = useMemo(() => dayRows(store, grnDocs), [store, grnDocs]);
   const pickedKey = picked === "all" ? "" : norm(picked);
@@ -93,6 +94,7 @@ export default function Discipline() {
               pins={pins}
               selected={picked === "all" ? "" : picked}
               onSelect={(name) => setPicked((p) => (p === name ? "all" : name))}
+              onClear={clearPick}
               legend={[
                 { label: "Number: days with a missing check", swatch: "figure" },
                 { label: "Has a missing check", swatch: "hot" },
@@ -193,7 +195,7 @@ export default function Discipline() {
                   <TableCell className="text-center">
                     <CheckStatus ok={r.ded} yes="Present" no="Missing" tip={r.ded ? "Sales deducted stock through the POS." : "No POS deductions found. Upload the sales or movement file."} />
                   </TableCell>
-                  <TableCell className={cn("text-right font-bold tabular-nums", r.counted && r.total <= -10 && "text-danger")}>{r.counted ? RM(r.total) : "None"}</TableCell>
+                  <TableCell className={cn("text-right font-bold tabular-nums", r.counted && signTone(r.total))}>{r.counted ? RM(r.total) : "None"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

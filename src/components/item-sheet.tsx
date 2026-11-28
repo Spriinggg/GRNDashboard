@@ -3,7 +3,7 @@
 import { useData } from "@/components/data-provider";
 import { ItemStatus } from "@/components/item-status";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { RM2, cap } from "@/lib/calc";
+import { RM2, cap, signTone } from "@/lib/calc";
 import { cn } from "@/lib/utils";
 
 // The detail panel of one item. Opens from the right, 42 rem wide, full width on a phone.
@@ -81,7 +81,7 @@ function Detail() {
             </div>
             <div className="flex justify-between px-3 py-2.5">
               <dt className="text-muted-foreground">Value</dt>
-              <dd className={cn("font-semibold tabular-nums", short && "text-danger")}>{RM2(it.varrm)}</dd>
+              <dd className={cn("font-semibold tabular-nums", signTone(it.varrm))}>{RM2(it.varrm)}</dd>
             </div>
           </dl>
         </section>

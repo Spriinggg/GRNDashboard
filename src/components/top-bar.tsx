@@ -4,7 +4,8 @@ import { usePathname } from "next/navigation";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { AlertsMenu } from "@/components/alerts-menu";
+import { CloudStatus } from "@/components/cloud-status";
 import { UserMenu } from "@/components/user-menu";
 import { useData } from "@/components/data-provider";
 import { ScopeBar } from "@/components/page-header";
@@ -13,10 +14,8 @@ const titles: Record<string, string> = { "/": "Dashboard", "/variance": "Food va
 
 export function TopBar() {
   const pathname = usePathname();
-  const { cur, cloud } = useData();
-  const showScope = pathname === "/" || ["/discipline"].some((p) => pathname.startsWith(p));
-  const cloudText = { off: "Local only", synced: "Cloud synced", saved: "Saved to cloud", loading: "Loading", error: "Cloud error" }[cloud];
-  const cloudDot = { off: "bg-muted-foreground", synced: "bg-success", saved: "bg-success", loading: "bg-primary", error: "bg-danger" }[cloud];
+  const { cur } = useData();
+  const showScope = ["/discipline"].some((p) => pathname.startsWith(p));
   const title = titles[pathname] ?? "US Pizza";
   return (
     <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur md:px-6">
@@ -46,11 +45,8 @@ export function TopBar() {
             Sample data
           </span>
         ) : null}
-        <span role="status" className="inline-flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs text-muted-foreground" title={cloudText}>
-          <span aria-hidden className={`size-2 rounded-full ${cloudDot}`} />
-          <span className="hidden xl:inline">{cloudText}</span>
-        </span>
-        <ThemeToggle />
+        <CloudStatus />
+        <AlertsMenu />
         <UserMenu />
       </div>
     </header>

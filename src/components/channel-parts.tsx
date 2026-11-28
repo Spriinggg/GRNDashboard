@@ -151,7 +151,7 @@ export function ChannelDonut({ rows, total, metric, measureLabel, focus, onPick 
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Against the period before</dt>
-                <dd className={cn("font-semibold tabular-nums", delta !== null && delta < 0 && "text-danger")}>{delta !== null ? fmtDelta(delta) : "–"}</dd>
+                <dd className={cn("font-semibold tabular-nums", delta !== null && (delta > 0 ? "text-success" : delta < 0 && "text-danger"))}>{delta !== null ? fmtDelta(delta) : "–"}</dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground">Average order</dt>

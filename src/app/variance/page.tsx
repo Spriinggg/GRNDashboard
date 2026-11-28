@@ -16,6 +16,7 @@ import { useTableView } from "@/hooks/use-table-view";
 import { OUTLETS, REGION_LABEL, sumDays } from "@/lib/overview-mock";
 import type { Region } from "@/lib/outlet-locations";
 import { CRIT_RM, ITEMS, PATTERN_LABEL, SHORT_RM, VPERIODS, buildGrid, foodCostOf, outletArea, outletName, regionOf, vPeriodOf } from "@/lib/variance-mock";
+import { signTone } from "@/lib/calc";
 import type { Cat, Cell, Pattern } from "@/lib/variance-mock";
 import { cn } from "@/lib/utils";
 
@@ -342,7 +343,7 @@ export default function FoodVariance() {
                 <SortHead label="Days short" sortKey="days" sort={tv.sort} onSort={tv.toggleSort} className="text-right" />
                 <SortHead label="Net variance" sortKey="net" sort={tv.sort} onSort={tv.toggleSort} className="text-right" />
                 <SortHead label="Last count" sortKey="last" sort={tv.sort} onSort={tv.toggleSort} className="text-right" />
-                <SortHead label="Pattern" sortKey="pattern" sort={tv.sort} onSort={tv.toggleSort} className="text-left" />
+                <SortHead label="Pattern" sortKey="pattern" sort={tv.sort} onSort={tv.toggleSort} className="text-right" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -360,7 +361,7 @@ export default function FoodVariance() {
                     </button>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{c.daysShort} of {c.days}</TableCell>
-                  <TableCell className={cn("text-right font-semibold tabular-nums", c.net <= -CRIT_RM && "text-danger")}>{signed(c.net)}</TableCell>
+                  <TableCell className={cn("text-right font-semibold tabular-nums", signTone(c.net))}>{signed(c.net)}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {c.last ? (
                       <>
@@ -371,7 +372,7 @@ export default function FoodVariance() {
                       "–"
                     )}
                   </TableCell>
-                  <TableCell><PatternMark p={c.pattern} /></TableCell>
+                  <TableCell className="pr-3 text-right"><PatternMark p={c.pattern} /></TableCell>
                 </TableRow>
               ))}
             </TableBody>

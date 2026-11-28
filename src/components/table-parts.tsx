@@ -82,14 +82,14 @@ export function TablePagination({
         bare ? "pt-3" : "border-t px-4 py-3",
       )}
     >
-      <div>
+      <div className="min-w-0 md:flex-1">
         <p aria-live="polite" className="tabular-nums">
           {view.total === 0 ? `No ${noun}` : `Showing ${view.from} to ${view.to} of ${view.total} ${noun}`}
         </p>
         {note ? <p>{note}</p> : null}
       </div>
       {paged ? (
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 md:shrink-0 md:flex-nowrap md:justify-end">
           {sizes ? (
             <FilterSelect
               label="Rows"

@@ -117,7 +117,7 @@ export function Chips<T extends string>({ label, options, value, onChange }: { l
 export function Delta({ d }: { d: number | null }) {
   if (d === null) return <span className="text-muted-foreground">–</span>;
   return (
-    <span className={cn("tabular-nums", d >= 0 ? "text-muted-foreground" : "font-medium text-danger")}>
+    <span className={cn("tabular-nums", d > 0 ? "text-success" : d < 0 ? "font-medium text-danger" : "text-muted-foreground")}>
       {d >= 0 ? "▲" : "▼"} {fmtDelta(d).slice(1)}
     </span>
   );

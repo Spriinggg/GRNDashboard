@@ -1,475 +1,359 @@
 "use client";
 
-import { AlertTriangle, ChevronRight, CircleAlert, CircleCheck, ClipboardCheck, MapPin, Percent, Upload } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import Link from "next/link";
-import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useMemo, useState } from "react";
+import { ChannelLogo } from "@/components/channel-parts";
+import { OverviewCard, PresetGroup, Segmented } from "@/components/dashboard-parts";
+import type { Change, Preset } from "@/components/dashboard-parts";
+import { HBars, Ring, SalesArea, TargetLine, Waterfall, compact } from "@/components/dashboard-charts";
+import { DateRangeFilter } from "@/components/date-range-filter";
 import { useData } from "@/components/data-provider";
-import { FoodCostBars, Sparkline, StatusDonut, TrendChart, VarianceBars } from "@/components/charts";
-import { ItemStatus } from "@/components/item-status";
+import { fmtDelta } from "@/components/drill-chart";
+import { FilterSelect } from "@/components/filter-select";
 import { OutletMap } from "@/components/outlet-map";
 import { PageHeader } from "@/components/page-header";
-import { StatusIndicator } from "@/components/status-indicator";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { RANK, RM, RM2, cap, datesFor, fmtD, fmtS, money, statusOf, totVar, weekToDate } from "@/lib/calc";
+import { FilterBar, FilterSearch } from "@/components/sales-ui";
+import { RM, signTone } from "@/lib/calc";
 import { dayRows } from "@/lib/checks";
+import { CHANNELS } from "@/lib/channel-mock";
+import { MTD_SPAN, SAMPLE_MAX, SAMPLE_MIN, buildOverview, outletMetrics, previousSpan, spanDays } from "@/lib/dashboard-data";
+import { isOpen, spanText, toIso } from "@/lib/date-span";
+import type { DateSpan } from "@/lib/date-span";
+import { TARGET as LABOUR_TARGET } from "@/lib/labour-mock";
+import { OUTLETS, REGION_LABEL } from "@/lib/overview-mock";
+import { outletLocations } from "@/lib/outlet-locations";
+import type { Region } from "@/lib/outlet-locations";
+import type { MapPin } from "@/lib/outlet-pins";
 import { outletRows } from "@/lib/outlets";
-import type { MapPin as Pin } from "@/lib/outlet-pins";
-import { cn } from "@/lib/utils";
+import { TARGET as TREAMS_TARGET } from "@/lib/treeams-mock";
 
-function Empty({ onSample }: { onSample: () => void }) {
-  return (
-    <Card className="gap-0 p-0 shadow-sm">
-      <div className="px-4 py-12 text-center">
-        <p className="font-semibold">No data loaded</p>
-        <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">Upload the daily Sales, Stock Count and Stock Movement Excel files to begin.</p>
-        <div className="mt-4 flex flex-wrap justify-center gap-2">
-          <Button nativeButton={false} render={<Link href="/upload" />}>Go to Upload</Button>
-          <Button variant="outline" onClick={onSample}>
-            Load sample day
-          </Button>
-        </div>
-      </div>
-    </Card>
-  );
-}
+const MTD = MTD_SPAN;
+const PRESETS: Preset[] = [
+  { key: "d7", label: "Last 7 days", span: { from: toIso(new Date(2026, SAMPLE_MAX.getMonth(), SAMPLE_MAX.getDate() - 6)), to: toIso(SAMPLE_MAX) } },
+  { key: "mtd", label: "Month to date", span: MTD },
+  { key: "oct", label: "October", span: { from: "2026-10-01", to: "2026-10-31" } },
+];
+const rmShort = (v: number) => RM(Math.round(v));
+const pts = (v: number) => `${Math.abs(v).toFixed(1)} points`;
+const when = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+};
+// A change smaller than a tenth of a point or percent is "no change", so a flat figure is not painted red or green.
+const flat = (n: number, unit: number) => Math.abs(n * unit) < 0.05;
 
-type Tone = "danger" | "warning" | "success";
-const bar: Record<Tone, string> = { danger: "bg-danger", warning: "bg-warning", success: "bg-success" };
-
-// One card, one headline figure and three rows. Each row is a link to the page behind it.
-function ProcessCard({ title, href, value, label, note, rows }: { title: string; href: string; value: string; label: string; note: string; rows: { label: string; tone: Tone; figure: string; share: number }[] }) {
-  return (
-    <Card className="gap-4 p-5 shadow-sm">
-      <h2 className="text-base font-semibold">
-        <Link href={href} className="inline-flex items-center gap-1 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
-          {title}
-          <ChevronRight aria-hidden className="size-4 text-muted-foreground" />
-        </Link>
-      </h2>
-      <div>
-        <p className="flex items-baseline gap-2 tabular-nums">
-          <span className="text-2xl leading-tight font-semibold">{value}</span>
-          <span className="text-sm text-muted-foreground">{label}</span>
-        </p>
-        <p className="text-xs text-muted-foreground">{note}</p>
-      </div>
-      <div className="flex flex-1 flex-col justify-between gap-3">
-        {rows.map((r) => (
-          <div key={r.label}>
-            <div className="flex items-center justify-between gap-3 text-sm tabular-nums">
-              <span className="flex items-center gap-2">
-                <i aria-hidden className={cn("size-2 rounded-full", bar[r.tone])} />
-                {r.label}
-              </span>
-              <span className="font-medium">{r.figure}</span>
-            </div>
-            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
-              <i className={cn("block h-full rounded-full", bar[r.tone])} style={{ width: `${Math.max(Math.min(r.share, 100), r.share ? 3 : 0)}%` }} />
-            </div>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-type Attn = { key: string; icon: LucideIcon; tone: "danger" | "warning" | "info"; title: React.ReactNode; detail: string; href?: string; onPick?: () => void };
-
-// The things to look at first, most serious first. Each one opens the place where it can be dealt with.
-function AttentionRow({ a }: { a: Attn }) {
-  const Icon = a.icon;
-  const inner = (
-    <>
-      <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", a.tone === "danger" ? "text-danger" : a.tone === "warning" ? "text-warning" : "text-primary")} />
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium">{a.title}</span>
-        <span className="block text-xs text-muted-foreground">{a.detail}</span>
-      </span>
-      <ChevronRight aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-    </>
-  );
-  const cls = "-mx-2 flex w-[calc(100%+1rem)] items-start gap-3 rounded-lg px-2 py-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring";
-  return a.href ? (
-    <Link href={a.href} className={cls}>
-      {inner}
-    </Link>
-  ) : (
-    <button type="button" onClick={a.onPick} className={cls}>
-      {inner}
-    </button>
-  );
-}
+type MapMetric = "sales" | "short" | "labour" | "checklists";
+const METRICS: { key: MapMetric; label: string }[] = [
+  { key: "sales", label: "Net sales" },
+  { key: "short", label: "Food short" },
+  { key: "labour", label: "Labour" },
+  { key: "checklists", label: "Checklists" },
+];
+const METRIC_LEGEND: Record<MapMetric, { figure: string; hot: string }> = {
+  sales: { figure: "Figure: net sales for the dates", hot: "" },
+  short: { figure: "Figure: food short for the dates", hot: "Short more than the network average" },
+  labour: { figure: "Figure: labour as a share of net sales", hot: `Over the ${LABOUR_TARGET}% target` },
+  checklists: { figure: "Figure: checklist tasks done", hot: `Under the ${TREAMS_TARGET}% target` },
+};
 
 export default function Dashboard() {
-  const { cur: d, store, grnDocs, loadSample, setOpenCode, setOutlet } = useData();
-  const outlets = useMemo(() => outletRows(store), [store]);
-  const days = useMemo(() => dayRows(store, grnDocs), [store, grnDocs]);
+  const { store, grnDocs } = useData();
+  const router = useRouter();
+  const go = (href: string) => () => router.push(href);
+  const [span, setSpan] = useState<DateSpan>(MTD);
+  const [region, setRegion] = useState<"all" | Region>("all");
+  const [q, setQ] = useState("");
+  // An outlet chosen on the map makes every card about that outlet.
+  const [picked, setPicked] = useState("");
+  const clearPick = useCallback(() => setPicked(""), []);
+  const [metric, setMetric] = useState<MapMetric>("sales");
+  const needle = q.trim().toLowerCase();
+  const prev = previousSpan(span);
+  const label = PRESETS.find((p) => p.span.from === span.from && p.span.to === span.to)?.label;
 
-  if (!d || !d.items) {
-    return (
-      <>
-        <PageHeader title="Dashboard" subtitle="Where the day's food cost drifted from recipe." />
-        <Empty onSample={loadSample} />
-      </>
-    );
-  }
+  // The outlets the search and region let through, then the one picked on the map if there is one.
+  const base = useMemo(() => OUTLETS.map((_, o) => o).filter((o) => (region === "all" || OUTLETS[o].region === region) && (!needle || (OUTLETS[o].name + " " + OUTLETS[o].area).toLowerCase().includes(needle))), [region, needle]);
+  const pool = useMemo(() => (picked ? OUTLETS.map((_, o) => o).filter((o) => OUTLETS[o].name === picked) : base), [picked, base]);
+  const poolNames = useMemo(() => new Set(pool.map((o) => OUTLETS[o].name.toLowerCase())), [pool]);
+  const ov = useMemo(() => buildOverview(span, pool), [span, pool]);
+  const metrics = useMemo(() => outletMetrics(span), [span]);
 
-  const items = d.items;
-  const tot = totVar(d);
-  const food = items.filter((x) => x.cat === "FOOD").reduce((s, x) => s + x.varrm, 0);
-  const atRisk = items.filter((x) => x.varrm < 0).reduce((s, x) => s + x.varrm, 0);
-  const c = { crit: 0, warn: 0, good: 0, info: 0 };
-  items.forEach((i) => c[statusOf(i)[0]]++);
-  const n = items.length || 1;
-  const flagged = items.length - c.good;
-  const m = money(d);
-  const wtd = m.ok ? weekToDate(store, d.ok) : null;
-  const dates = datesFor(store, d.ok);
-  const trend = dates.map((dt) => ({ label: fmtS(dt), value: Math.round(totVar(store[d.ok + "|" + dt])) }));
-  const showTrend = trend.length >= 2;
-  const big = items.slice().sort((a, b) => a.varrm - b.varrm)[0];
-  const top = items
-    .filter((x) => Math.abs(x.varrm) >= 10)
-    .sort((a, b) => Math.abs(b.varrm) - Math.abs(a.varrm))
-    .slice(0, 7)
-    .sort((a, b) => a.varrm - b.varrm)
-    .map((x) => ({ label: x.name, value: x.varrm, key: x.code }));
-  const cats = [...new Set(items.map((i) => i.cat))].map((cat) => ({ cat, n: items.filter((i) => i.cat === cat).length, v: items.filter((i) => i.cat === cat).reduce((s, x) => s + x.varrm, 0) }));
-  const catMax = Math.max(1, ...cats.map((x) => Math.abs(x.v)));
-  const rows = items
-    .filter((i) => statusOf(i)[0] !== "good")
-    .sort((a, b) => RANK[statusOf(a)[0]] - RANK[statusOf(b)[0]] || a.varrm - b.varrm)
-    .slice(0, 8);
+  // Real files: Count & GRN, Outlets and Uploads. Outlets use the latest loaded day, the other two the dates chosen.
+  const outlets = useMemo(() => outletRows(store).filter((r) => poolNames.has(r.name.toLowerCase())), [store, poolNames]);
+  const okSet = useMemo(() => new Set(outlets.filter((r) => r.on).map((r) => r.ok)), [outlets]);
+  const days = useMemo(() => dayRows(store, grnDocs).filter((r) => okSet.has(r.ok) && r.iso >= span.from && r.iso <= span.to), [store, grnDocs, okSet, span]);
+  const withData = outlets.filter((r) => r.on);
+  const crit = withData.filter((r) => r.status === "crit").length;
+  const warn = withData.filter((r) => r.status === "warn").length;
+  const good = withData.filter((r) => r.status === "good").length;
+  const complete = days.filter((r) => r.complete).length;
+  const nCount = days.filter((r) => r.counted).length;
+  const nGrn = days.filter((r) => r.grn).length;
+  const nDed = days.filter((r) => r.ded).length;
+  const last = Object.values(store)
+    .filter((d) => okSet.has(d.ok) && d.upAt)
+    .sort((a, b) => (b.upAt ?? "").localeCompare(a.upAt ?? ""))[0];
 
-  // Count & GRN checks over every loaded day (all outlets).
-  const nDays = days.length || 1;
-  const counted = days.filter((r) => r.counted).length;
-  const grnDone = days.filter((r) => r.grn).length;
-  const dedDone = days.filter((r) => r.ded).length;
-  const daysMissing = days.filter((r) => !r.complete).length;
-  const withData = outlets.filter((o) => o.on).length;
+  // The map shows all 44 outlets for the figure chosen. An outlet the filters leave out is drawn as a small grey logo.
+  const baseSet = useMemo(() => new Set(base), [base]);
+  const avgShort = useMemo(() => {
+    const open = metrics.filter((m) => m.open);
+    return open.length ? open.reduce((s, m) => s + m.shortPct, 0) / open.length : 0;
+  }, [metrics]);
+  const pins: MapPin[] = useMemo(
+    () =>
+      outletLocations.map((l, i) => {
+        const m = metrics[i];
+        const out = !m.open || !baseSet.has(i);
+        const v = metric === "sales" ? `RM ${compact(m.sales)}` : metric === "short" ? `−RM ${compact(m.short)}` : metric === "labour" ? `${m.labour.toFixed(0)}%` : `${m.treeams.toFixed(0)}%`;
+        const hot = !out && (metric === "short" ? m.shortPct > avgShort * 1.25 : metric === "labour" ? m.labour > LABOUR_TARGET : metric === "checklists" ? m.treeams < TREAMS_TARGET : false);
+        return { name: l.name, lat: l.lat, lng: l.lng, region: l.region, value: v, hot, empty: out, title: out ? `${l.name}: not in these filters` : `${l.name}: ${v}`, tip: out ? `${l.name} · not in these filters` : `${l.name} · ${v}` };
+      }),
+    [metrics, metric, baseSet, avgShort],
+  );
 
-  const src: [string, boolean][] = [
-    ["Sales", !!d.sales],
-    ["Stock count", !!d.nCounts],
-    ["Stock movement", !!d.mv],
-    ["GRN", grnDocs.length > 0],
-  ];
-  const missingFiles = src.filter((x) => !x[1]).map((x) => x[0]);
+  const none = pool.length === 0;
+  const dayNote = `${ov.days} ${ov.days === 1 ? "day" : "days"}`;
+  const vs = ov.hasPrev && prev ? `against ${spanText(prev)}` : "no earlier dates to compare";
+  const scope = picked || (region === "all" ? "all outlets" : REGION_LABEL[region]);
 
-  const negSum = items.filter((x) => x.varrm < 0).reduce((s, x) => s + x.varrm, 0);
-  const attention: Attn[] = [];
-  if (big && big.varrm < 0) {
-    attention.push({
-      key: "big",
-      icon: AlertTriangle,
-      tone: "danger",
-      title: `${big.name} is short ${RM2(big.varrm).replace("−", "")}`,
-      detail: `${big.sys} ${big.uom} expected, ${big.phys} counted. ${negSum ? Math.round((big.varrm / negSum) * 100) : 0}% of all shortfalls today.`,
-      onPick: () => setOpenCode(big.code),
-    });
-  }
-  if (c.crit) {
-    attention.push({ key: "crit", icon: AlertTriangle, tone: "danger", title: `${c.crit} critical item${c.crit === 1 ? "" : "s"}`, detail: `Short by RM 50 or more. ${c.warn} more ${c.warn === 1 ? "is" : "are"} short by RM 10 to 50.`, href: "/variance?st=crit" });
-  }
-  if (m.ok && m.actPct > m.idealPct) {
-    attention.push({ key: "cost", icon: Percent, tone: "warning", title: `Food cost is ${m.actPct.toFixed(1)}% of sales`, detail: `Ideal is ${m.idealPct.toFixed(1)}%, so ${(m.actPct - m.idealPct).toFixed(1)} points above recipe.`, href: "/variance" });
-  }
-  if (missingFiles.length) {
-    attention.push({ key: "files", icon: Upload, tone: "warning", title: `${missingFiles.length} file${missingFiles.length === 1 ? "" : "s"} missing for this day`, detail: missingFiles.join(", "), href: "/upload" });
-  }
-  if (daysMissing) {
-    attention.push({ key: "days", icon: ClipboardCheck, tone: "warning", title: `${daysMissing} of ${days.length} day${days.length === 1 ? "" : "s"} with a missing check`, detail: "Stock count, GRN or POS deductions not found.", href: "/discipline" });
-  }
-  if (withData < outlets.length) {
-    attention.push({ key: "outlets", icon: MapPin, tone: "info", title: `${outlets.length - withData} of ${outlets.length} outlets have no data yet`, detail: "Upload their files to include them.", href: "/outlets" });
-  }
+  const salesChange: Change | null = ov.sales.delta === null ? null : flat(ov.sales.delta, 100) ? { text: `no change ${vs}`, n: 0 } : { text: `${fmtDelta(ov.sales.delta)} ${vs}`, n: ov.sales.delta };
+  const ptsChange = (n: number | null, what: string, good?: boolean): Change | null => (n === null ? null : flat(n, 1) ? { text: `${what ? what + " " : ""}no change on the dates before`, n: 0, good } : { text: `${what ? what + " " : ""}${n >= 0 ? "up" : "down"} ${pts(n)}${what ? "" : " on the dates before"}`, n, good });
+  const marginChange = ptsChange(ov.pnl.marginPts, "margin");
+  const foodChange: Change | null = ov.food.delta === null ? null : flat(ov.food.delta, 100) ? { text: "no change on the dates before", n: 0, good: false } : { text: `${ov.food.delta >= 0 ? "up" : "down"} ${Math.abs(ov.food.delta * 100).toFixed(1)}% on the dates before`, n: ov.food.delta, good: false };
+  const labourChange = ptsChange(ov.labour.ptsVsBefore, "", false);
+  const treamsChange = ptsChange(ov.treeams.ptsVsBefore, "");
 
-  const pins: Pin[] = outlets.map((r) => ({
-    name: r.name,
-    lat: r.lat,
-    lng: r.lng,
-    region: r.region,
-    value: r.on ? RM(r.total) : "",
-    hot: r.on && r.crit > 0,
-    empty: !r.on,
-    title: r.on ? `${r.name}: food variance ${RM(r.total)}, ${r.flagged} items flagged` : `${r.name}: no data yet`,
-    tip: r.on ? `${r.name} · ${RM(r.total)} · ${r.flagged} flagged` : `${r.name} · no data yet`,
-  }));
+  const clearAll = () => {
+    setSpan(MTD);
+    setRegion("all");
+    setQ("");
+    setPicked("");
+  };
 
-  const slices = [
-    { name: "Critical", value: c.crit, color: "var(--danger)" },
-    { name: "Short", value: c.warn, color: "var(--warning)" },
-    { name: "On target", value: c.good, color: "var(--success)" },
-    { name: "Over", value: c.info, color: "var(--muted-foreground)" },
-  ];
-  const costMax = m.ok ? Math.max(m.actual, m.ideal, 1) : 1;
+  const maxItem = ov.food.items[0]?.short || 1;
+  const net = ov.sales.net;
 
   return (
     <>
-      <PageHeader title="Dashboard" subtitle={`${d.outlet} · ${fmtD(d.date)} · where the day's food cost drifted from recipe`} />
+      <PageHeader title="Dashboard" subtitle="Every page at a glance for the dates you choose. Point at a chart to read it, click it to open the page." />
 
-      <Card className="gap-3 p-6 shadow-sm">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-base font-semibold">Needs your attention</h2>
-          <p className="text-xs text-muted-foreground tabular-nums">{attention.length} item{attention.length === 1 ? "" : "s"}</p>
+      <FilterBar
+        active={[
+          ...(picked ? [{ key: "picked", label: `Outlet: ${picked}`, onClear: clearPick }] : []),
+          ...(region !== "all" ? [{ key: "region", label: `Region: ${REGION_LABEL[region]}`, onClear: () => setRegion("all") }] : []),
+          ...(q ? [{ key: "q", label: `Search: “${q}”`, onClear: () => setQ("") }] : []),
+          ...(span.from !== MTD.from || span.to !== MTD.to ? [{ key: "dates", label: `Dates: ${spanText(span)}`, onClear: () => setSpan(MTD) }] : []),
+        ]}
+        onClearAll={clearAll}
+        summary={`${picked || `${pool.length} ${pool.length === 1 ? "outlet" : "outlets"}`} · ${spanText(span)} (${dayNote}) · ${vs}`}
+        extra={
+          <>
+            <DateRangeFilter label="Dates" value={span} onChange={(v) => setSpan(isOpen(v) ? MTD : v)} min={SAMPLE_MIN} max={SAMPLE_MAX} />
+            <PresetGroup presets={PRESETS} value={span} onPick={setSpan} />
+            {!label ? <span className="text-xs text-muted-foreground">Custom dates, {spanDays(span)} days</span> : null}
+          </>
+        }
+      >
+        <FilterSearch value={q} onChange={setQ} placeholder="Search outlets" />
+        <FilterSelect boxed label="Region" value={region} onChange={(v) => setRegion(v as "all" | Region)} options={[{ value: "all", label: "All regions" }, ...(Object.keys(REGION_LABEL) as Region[]).map((r) => ({ value: r, label: REGION_LABEL[r] }))]} />
+      </FilterBar>
+
+      {none ? (
+        <div className="rounded-xl bg-card px-4 py-12 text-center shadow-sm ring-1 ring-foreground/10">
+          <p className="font-semibold">No outlets match these filters</p>
+          <button type="button" onClick={clearAll} className="mt-3 text-sm text-primary underline-offset-2 hover:underline">Clear filters</button>
         </div>
-        {attention.length ? (
-          <div className="grid gap-x-10 gap-y-1 md:grid-cols-2">
-            {attention.slice(0, 6).map((a) => (
-              <AttentionRow key={a.key} a={a} />
-            ))}
-          </div>
-        ) : (
-          <StatusIndicator icon={CircleCheck} tone="success">
-            Nothing needs attention for this day
-          </StatusIndicator>
-        )}
-      </Card>
-
-      <section aria-label="Summary" className="grid gap-4 lg:grid-cols-12">
-        <div className="flex flex-col justify-between gap-5 rounded-xl bg-primary p-6 text-primary-foreground shadow-sm lg:col-span-5">
-          <div>
-            <p className="text-sm opacity-85">Food variance for the day</p>
-            <p className="mt-1 font-display text-[40px] leading-tight font-bold tracking-tight tabular-nums">{RM(tot)}</p>
-            <p className="mt-1 flex items-center gap-1.5 text-sm font-medium">
-              {tot < 0 ? <AlertTriangle aria-hidden className="size-4" /> : <CircleCheck aria-hidden className="size-4" />}
-              {tot < 0 ? "Over recipe: more stock used than sales explain" : "At or under recipe"}
-            </p>
-          </div>
-          <dl className="grid grid-cols-3 gap-3 text-sm">
-            {[
-              ["Food only", RM(food)],
-              ["Total shortfall", RM(atRisk)],
-              ["Sales", m.ok ? RM(m.sales) : "n/a"],
-            ].map(([k, v]) => (
-              <div key={k} className="border-l border-primary-foreground/30 pl-3">
-                <dt className="opacity-85">{k}</dt>
-                <dd className="text-base font-bold tabular-nums">{v}</dd>
-              </div>
-            ))}
-          </dl>
-          {showTrend ? (
-            <div className="text-primary-foreground">
-              <p className="text-xs opacity-85">Daily food variance, {trend[0].label} to {trend[trend.length - 1].label}</p>
-              <Sparkline points={trend} label={`Daily food variance for ${trend.length} days.`} />
+      ) : (
+        <>
+          <section aria-label="Map and sales" className="grid gap-4 lg:grid-cols-12">
+            <div className="flex lg:col-span-7">
+              <OutletMap
+                title="Outlets on the map"
+                pins={pins}
+                selected={picked}
+                onSelect={(name) => setPicked((p) => (p === name ? "" : name))}
+                onClear={clearPick}
+                extra={<Segmented label="Figure on the map" options={METRICS} value={metric} onChange={setMetric} />}
+                legend={[
+                  { label: METRIC_LEGEND[metric].figure, swatch: "figure" },
+                  ...(METRIC_LEGEND[metric].hot ? [{ label: METRIC_LEGEND[metric].hot, swatch: "hot" as const }] : []),
+                  { label: "Not open or not in the filters", swatch: "empty" },
+                  { label: "Chosen outlet", swatch: "selected" },
+                ]}
+                help="Click an outlet to make every card about it, click it again to show all."
+              />
             </div>
-          ) : m.ok ? (
-            <div className="flex flex-col gap-2 text-xs" role="img" aria-label={`Actual food cost ${m.actPct.toFixed(1)}% of sales against an ideal of ${m.idealPct.toFixed(1)}%.`}>
-              {(
-                [
-                  ["Actual food cost", m.actPct, 1],
-                  ["Ideal food cost", m.idealPct, 0.55],
-                ] as const
-              ).map(([k, v, o]) => (
-                <div key={k}>
-                  <div className="mb-1 flex justify-between tabular-nums">
-                    <span className="opacity-85">{k}</span>
-                    <b>{v.toFixed(1)}%</b>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-primary-foreground/20">
-                    <i className="block h-full rounded-full bg-primary-foreground" style={{ width: `${Math.min((v / Math.max(m.actPct, m.idealPct, 1)) * 100, 100)}%`, opacity: o }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-        <div className="flex lg:col-span-7">
-          <OutletMap
-            pins={pins}
-            selected={d.outlet}
-            onSelect={(name) => {
-              const r = outlets.find((o) => o.name === name);
-              if (r?.on) setOutlet(r.ok);
-            }}
-            legend={[
-              { label: "Figure: food variance of the latest day", swatch: "figure" },
-              { label: "Has a critical item", swatch: "hot" },
-              { label: "No data yet", swatch: "empty" },
-              { label: "Selected outlet", swatch: "selected" },
-            ]}
-            help="Click an outlet with data to switch the dashboard to it."
-          />
-        </div>
-      </section>
+            <OverviewCard
+              sample
+              className="lg:col-span-5"
+              title="Sales by outlet"
+              href="/sales/by-outlet"
+              value={rmShort(net)}
+              label={`net sales, ${dayNote}`}
+              change={salesChange}
+              note={`For ${scope}`}
+              visual={<SalesArea data={ov.sales.daily} label={`Net sales each day for ${ov.sales.daily.length} days.`} onOpen={go("/sales/by-outlet")} />}
+              rows={ov.sales.top.length > 1 ? ov.sales.top.map((t, i) => ({ key: t.name, label: t.name, figure: rmShort(t.net), share: (t.net / (ov.sales.top[0].net || 1)) * 100, tone: i === 0 ? "primary" : "muted" })) : undefined}
+              linkText="Open sales by outlet"
+            />
+          </section>
 
-      <section aria-label="Variance charts" className="grid gap-4 lg:grid-cols-12">
-        <Card className="gap-3 p-6 shadow-sm lg:col-span-7">
-          <h2 className="text-base font-semibold">Biggest variances</h2>
-          <p className="text-xs text-muted-foreground">Value at risk, largest first. Select a bar to open the item.</p>
-          {top.length ? <VarianceBars rows={top} onPick={setOpenCode} /> : <p className="text-sm text-muted-foreground">No item is off by more than RM 10. A clean day.</p>}
-        </Card>
-        <Card className="gap-4 p-6 shadow-sm lg:col-span-5">
-          <div>
-            <h2 className="text-base font-semibold">Items by status</h2>
-            <p className="text-xs text-muted-foreground">All {items.length} counted items on {fmtD(d.date)}.</p>
-          </div>
-          <div className="flex flex-1 flex-wrap items-center justify-center gap-x-8 gap-y-4">
-            <StatusDonut slices={slices} total={items.length} caption="Items by status" />
-            <ul className="flex min-w-[10rem] flex-1 flex-col gap-2 text-sm">
-              {slices.map((s) => (
-                <li key={s.name} className="flex items-center justify-between gap-3 tabular-nums">
-                  <span className="flex items-center gap-2">
-                    <i aria-hidden className="size-2.5 rounded-[3px]" style={{ background: s.color }} />
-                    {s.name}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {s.value} <span className="ml-1 font-medium text-foreground">{Math.round((s.value / n) * 100)}%</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Card>
-      </section>
-
-      <section aria-label="Food cost charts" className="grid gap-4 lg:grid-cols-12">
-        <Card className="gap-3 p-6 shadow-sm lg:col-span-5">
-          <div>
-            <h2 className="text-base font-semibold">Actual vs ideal food cost</h2>
-            <p className="text-xs text-muted-foreground">Share of sales spent on food.</p>
-          </div>
-          {m.ok ? <FoodCostBars today={m} wtd={wtd && wtd.sales !== m.sales ? wtd : null} /> : <p className="text-sm text-muted-foreground">Needs Sales, Stock Count and Stock Movement all loaded for this day.</p>}
-        </Card>
-        {showTrend ? (
-          <Card className="gap-3 p-6 shadow-sm lg:col-span-7">
-            <div>
-              <h2 className="text-base font-semibold">Variance trend</h2>
-              <p className="text-xs text-muted-foreground">Daily food variance for {d.outlet}.</p>
-            </div>
-            <TrendChart store={store} ok={d.ok} />
-          </Card>
-        ) : (
-          <Card className="gap-4 p-6 shadow-sm lg:col-span-7">
-            <div>
-              <h2 className="text-base font-semibold">Variance by category</h2>
-              <p className="text-xs text-muted-foreground">Net variance for food and packaging. A trend appears once two days are loaded.</p>
-            </div>
-            <div className="flex flex-1 flex-col justify-center gap-5">
-              {cats.map((x) => (
-                <div key={x.cat}>
-                  <div className="flex justify-between text-sm tabular-nums">
-                    <span>
-                      <b>{cap(x.cat.toLowerCase())}</b> <span className="text-muted-foreground">{x.n} items</span>
-                    </span>
-                    <span className={cn("font-medium", x.v < 0 && "text-danger")}>{RM(x.v)}</span>
-                  </div>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-                    <i className={cn("block h-full rounded-full", x.v < 0 ? "bg-danger" : "bg-muted-foreground")} style={{ width: `${Math.max((Math.abs(x.v) / catMax) * 100, 3)}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
-      </section>
-
-      <section aria-label="Where things stand" className="grid gap-4 lg:grid-cols-3">
-        <ProcessCard
-          title="Items to check"
-          href="/variance"
-          value={String(flagged)}
-          label={`of ${items.length} items`}
-          note="Counted stock outside RM 10 of the system."
-          rows={[
-            { label: "Critical", tone: "danger", figure: String(c.crit), share: (c.crit / n) * 100 },
-            { label: "Short", tone: "warning", figure: String(c.warn), share: (c.warn / n) * 100 },
-            { label: "On target", tone: "success", figure: String(c.good), share: (c.good / n) * 100 },
-          ]}
-        />
-        <ProcessCard
-          title="Count & GRN"
-          href="/discipline"
-          value={`${days.length - daysMissing}/${days.length}`}
-          label="days complete"
-          note={daysMissing ? `${daysMissing} day${daysMissing === 1 ? "" : "s"} with a missing check.` : "Every loaded day has all three checks."}
-          rows={[
-            { label: "Stock counted", tone: counted === days.length ? "success" : "danger", figure: `${counted} of ${days.length}`, share: (counted / nDays) * 100 },
-            { label: "GRN posted", tone: grnDone === days.length ? "success" : "warning", figure: `${grnDone} of ${days.length}`, share: (grnDone / nDays) * 100 },
-            { label: "POS deductions", tone: dedDone === days.length ? "success" : "warning", figure: `${dedDone} of ${days.length}`, share: (dedDone / nDays) * 100 },
-          ]}
-        />
-        {m.ok ? (
-          <ProcessCard
-            title="Food cost"
-            href="/variance"
-            value={RM(m.variance)}
-            label={m.variance > 0 ? "over ideal" : "under ideal"}
-            note={`${m.actPct.toFixed(1)}% of sales against an ideal of ${m.idealPct.toFixed(1)}%.`}
-            rows={[
-              { label: "Actual food", tone: m.actual > m.ideal ? "danger" : "success", figure: RM(m.actual), share: (m.actual / costMax) * 100 },
-              { label: "Ideal food", tone: "success", figure: RM(m.ideal), share: (m.ideal / costMax) * 100 },
-              { label: "Sales", tone: "warning", figure: RM(m.sales), share: (m.sales / Math.max(m.sales, costMax)) * 100 },
-            ]}
-          />
-        ) : (
-          <Card className="gap-1 p-5 shadow-sm">
-            <h2 className="text-base font-semibold">Food cost</h2>
-            <p className="text-sm text-muted-foreground">Needs Sales, Stock Count and Stock Movement all loaded for this day.</p>
-          </Card>
-        )}
-      </section>
-
-      <Card className="gap-3 p-6 shadow-sm">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-base font-semibold">Items to check first</h2>
-          <Link href="/variance" className="inline-flex items-center gap-1 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-            All {items.length} items
-            <ChevronRight aria-hidden className="size-4" />
-          </Link>
-        </div>
-        {rows.length ? (
-          <div className="overflow-x-auto">
-            <Table className="min-w-[640px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Item</TableHead>
-                  <TableHead className="text-right">Expected</TableHead>
-                  <TableHead className="text-right">Counted</TableHead>
-                  <TableHead className="text-right">Value</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((it) => (
-                  <TableRow key={it.code} className="cursor-pointer" onClick={() => setOpenCode(it.code)}>
-                    <TableCell>
-                      <button type="button" className="text-left font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Open ${it.name}`}>
-                        {it.name}
-                      </button>
-                      <div className="text-xs text-muted-foreground">{cap(it.cat.toLowerCase())}</div>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{it.sys} {it.uom}</TableCell>
-                    <TableCell className="text-right tabular-nums">{it.phys} {it.uom}</TableCell>
-                    <TableCell className={cn("text-right font-semibold tabular-nums", it.varrm < 0 && "text-danger")}>{RM2(it.varrm)}</TableCell>
-                    <TableCell className="text-center">
-                      <ItemStatus item={it} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">Every counted item is within RM 10 of the system.</p>
-        )}
-      </Card>
-
-      <p role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        {missingFiles.length ? (
-          <StatusIndicator icon={CircleAlert} tone="warning">
-            Missing for this day: {missingFiles.join(", ")}
-          </StatusIndicator>
-        ) : (
-          <StatusIndicator icon={CircleCheck} tone="success">
-            All 4 files loaded for this day
-          </StatusIndicator>
-        )}
-      </p>
+          <section aria-label="Every page" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <OverviewCard
+              sample
+              title="Sales by channel"
+              href="/sales/by-channel"
+              value={`${ov.channels[0].share.toFixed(0)}%`}
+              label={`from ${CHANNELS.find((c) => c.key === ov.channels[0].key)!.short}, the biggest channel`}
+              note="Share of net sales by channel"
+              visual={
+                <Ring
+                  unit="net sales"
+                  total={`RM ${compact(net)}`}
+                  label="Net sales by channel"
+                  onOpen={go("/sales/by-channel")}
+                  fmt={(v) => `RM ${compact(v)}`}
+                  slices={ov.channels.map((c) => {
+                    const ch = CHANNELS.find((x) => x.key === c.key)!;
+                    return { key: c.key, label: ch.short, value: Math.round(c.net), color: ch.color, node: <ChannelLogo channel={ch} size="chip" /> };
+                  })}
+                />
+              }
+              linkText="Open sales by channel"
+            />
+            <OverviewCard
+              sample
+              title="Profit & loss"
+              href="/pnl"
+              value={rmShort(ov.pnl.gross)}
+              label={`gross profit, ${ov.pnl.margin.toFixed(1)}% margin`}
+              change={marginChange}
+              note="Net sales less platform fees and the cost of food. Labour and overheads are not in yet."
+              visual={
+                <Waterfall
+                  label={`Net sales ${rmShort(net)}, less fees ${rmShort(ov.pnl.fees)}, less the cost of food ${rmShort(ov.pnl.food)}, leaves gross profit ${rmShort(ov.pnl.gross)}.`}
+                  onOpen={go("/pnl")}
+                  rows={[
+                    { name: "Net sales", range: [0, net], text: `RM ${compact(net)}`, share: 100, color: "var(--muted-foreground)" },
+                    { name: "Fees", range: [net - ov.pnl.fees, net], text: `−${compact(ov.pnl.fees)}`, share: ov.pnl.feesPct, color: "var(--muted-foreground)" },
+                    { name: "Food", range: [ov.pnl.gross, net - ov.pnl.fees], text: `−${compact(ov.pnl.food)}`, share: ov.pnl.foodPct, color: "var(--muted-foreground)" },
+                    { name: "Gross profit", range: [0, ov.pnl.gross], text: `RM ${compact(ov.pnl.gross)}`, share: ov.pnl.margin, color: "var(--primary)" },
+                  ]}
+                />
+              }
+              linkText="Open profit & loss"
+            />
+            <OverviewCard
+              sample
+              title="Food variance"
+              href="/variance"
+              value={<span className={signTone(-ov.food.short)}>{ov.food.short ? `−${rmShort(ov.food.short)}` : rmShort(0)}</span>}
+              label={`short, ${ov.food.shortPct.toFixed(1)}% of sales`}
+              change={foodChange}
+              note={`${ov.food.repeated} ${ov.food.repeated === 1 ? "pair is" : "pairs are"} repeatedly short. The items short most:`}
+              visual={
+                <HBars
+                  label={`The ${ov.food.items.length} items short most, ${ov.food.items.map((i) => `${i.name} ${rmShort(i.short)}`).join(", ")}.`}
+                  domain={maxItem * 1.05}
+                  hint="Click to open Food variance"
+                  onOpen={go("/variance")}
+                  rows={ov.food.items.map((t) => ({ key: t.name, label: t.name, value: t.short, text: `−${compact(t.short)}`, color: "var(--danger)", tip: [["Short", `−${rmShort(t.short)}`], ["Of all short", `${ov.food.short ? Math.round((t.short / ov.food.short) * 100) : 0}%`]] }))}
+                />
+              }
+              linkText="Open food variance"
+            />
+            <OverviewCard
+              title="Count & GRN"
+              href="/discipline"
+              value={days.length ? `${complete} of ${days.length}` : "–"}
+              label="days with every check"
+              note="Stock count, GRN and POS deductions, from the files uploaded"
+              empty={days.length ? undefined : "No uploaded days fall in these dates for these outlets."}
+              visual={
+                <HBars
+                  label={`Checks over ${days.length} loaded days: stock count ${nCount}, GRN ${nGrn}, POS deductions ${nDed}.`}
+                  domain={100}
+                  hint="Click to open Count & GRN"
+                  onOpen={go("/discipline")}
+                  rows={[
+                    { key: "c", label: "Stock count", value: (nCount / (days.length || 1)) * 100, text: `${nCount} of ${days.length}`, color: nCount === days.length ? "var(--success)" : "var(--warning)" },
+                    { key: "g", label: "GRN", value: (nGrn / (days.length || 1)) * 100, text: `${nGrn} of ${days.length}`, color: nGrn === days.length ? "var(--success)" : "var(--warning)" },
+                    { key: "d", label: "POS deductions", value: (nDed / (days.length || 1)) * 100, text: `${nDed} of ${days.length}`, color: nDed === days.length ? "var(--success)" : "var(--warning)" },
+                  ]}
+                />
+              }
+              linkText="Open count & GRN"
+            />
+            <OverviewCard
+              title="Outlets"
+              href="/outlets"
+              value={`${withData.length} of ${outlets.length}`}
+              label="outlets with data"
+              note="Status of each outlet on its latest loaded day"
+              visual={
+                <Ring
+                  unit="outlets"
+                  total={String(outlets.length)}
+                  label={`Outlet status: ${crit} critical, ${warn} short, ${good} on target, ${outlets.length - withData.length} with no data.`}
+                  onOpen={go("/outlets")}
+                  slices={[
+                    { key: "crit", label: "Critical", value: crit, color: "var(--danger)" },
+                    { key: "warn", label: "Short", value: warn, color: "var(--warning)" },
+                    { key: "good", label: "On target", value: good, color: "var(--success)" },
+                    { key: "none", label: "No data yet", value: outlets.length - withData.length, color: "var(--muted-foreground)" },
+                  ]}
+                />
+              }
+              linkText="Open outlets"
+            />
+            <OverviewCard
+              sample
+              title="Labour vs sales"
+              href="/labor"
+              value={`${ov.labour.pct.toFixed(1)}%`}
+              label={`of net sales, target under ${LABOUR_TARGET}%`}
+              change={labourChange}
+              note={`${ov.labour.over} of ${ov.labour.of} ${ov.labour.of === 1 ? "outlet is" : "outlets are"} over the target. Overtime is ${ov.labour.ot.toFixed(1)}% of hours.`}
+              visual={<TargetLine data={ov.labour.daily} target={LABOUR_TARGET} name="Labour share" label={`Labour as a share of net sales each day against the ${LABOUR_TARGET} percent target.`} onOpen={go("/labor")} />}
+              linkText="Open labour vs sales"
+            />
+            <OverviewCard
+              sample
+              title="Treeams checklists"
+              href="/treeams"
+              value={`${ov.treeams.pct.toFixed(1)}%`}
+              label={`of tasks done, target ${TREAMS_TARGET}%`}
+              change={treamsChange}
+              note={`${ov.treeams.under} of ${ov.treeams.of} ${ov.treeams.of === 1 ? "outlet is" : "outlets are"} under the target`}
+              visual={
+                <HBars
+                  label={`Tasks done for each checklist against the ${TREAMS_TARGET} percent target.`}
+                  domain={100}
+                  target={{ value: TREAMS_TARGET, text: `Target ${TREAMS_TARGET}%` }}
+                  hint="Click to open Treeams"
+                  onOpen={go("/treeams")}
+                  rows={ov.treeams.byType.map((t) => ({ key: t.type, label: t.label, value: t.pct, text: `${t.pct.toFixed(0)}%`, color: t.pct < TREAMS_TARGET ? "var(--primary)" : undefined, tip: [["Tasks done", `${t.pct.toFixed(1)}%`], ["Target", `${TREAMS_TARGET}%`]] }))}
+                />
+              }
+              linkText="Open treeams"
+            />
+            <OverviewCard
+              title="Upload data"
+              href="/upload"
+              value={String(days.length)}
+              label={days.length === 1 ? "day loaded in these dates" : "days loaded in these dates"}
+              note={last?.upAt ? `Last upload ${when(last.upAt)}${last.upBy ? ` by ${last.upBy}` : ""}` : "Nothing uploaded in these dates yet"}
+              rows={[
+                { key: "o", label: "Outlets with files", figure: `${okSet.size} of ${outlets.length}`, share: outlets.length ? (okSet.size / outlets.length) * 100 : 0, tone: "muted" },
+                { key: "c", label: "Days with every check", figure: `${complete} of ${days.length}`, share: days.length ? (complete / days.length) * 100 : 0, tone: complete === days.length ? "success" : "warning" },
+              ]}
+              linkText="Go to upload"
+            />
+          </section>
+          <p className="text-xs text-muted-foreground">Cards marked Sample data use generated figures until their reports are loaded. Count &amp; GRN, Outlets and Upload data use the real files.</p>
+        </>
+      )}
     </>
   );
 }

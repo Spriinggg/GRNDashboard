@@ -52,14 +52,38 @@
   filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
 }
 
-/* An outlet with no data yet is a small dot, so the pins with figures stand out. */
-.outlet-pin[data-empty="true"] {
-  width: 12px;
-  height: 12px;
-  padding: 0;
-  gap: 0;
-  border-color: var(--muted-foreground);
-  transform: translate(-50%, -50%);
+/* The US Pizza logo on every pin. It sits on a white tile so it reads on the red selected pin and in dark mode. */
+.outlet-pin-logo {
+  display: block;
+  width: 33px;
+  height: 22px;
+  padding: 1px 3px;
+  margin: -1px 0 -1px -6px;
+  border-radius: 999px;
+  background: #fff;
+  object-fit: contain;
+  pointer-events: none;
 }
-.outlet-pin[data-empty="true"]::after { display: none; }
+/* An outlet with no data yet shows only the logo, in grey, so the pins with figures stand out. */
+.outlet-pin[data-empty="true"] {
+  gap: 0;
+  padding: 3px 6px 3px 9px;
+  border-color: var(--muted-foreground);
+}
+.outlet-pin[data-empty="true"] .outlet-pin-logo { filter: grayscale(1); opacity: 0.85; margin-left: -6px; }
+.outlet-pin[data-empty="true"]::after { border-color: var(--muted-foreground); }
 .outlet-pin[data-empty="true"][data-selected="true"] { background: var(--primary); border-color: var(--primary); }
+.outlet-pin[data-empty="true"][data-selected="true"] .outlet-pin-logo { filter: none; opacity: 1; }
+.outlet-pin[data-empty="true"][data-selected="true"]::after { border-color: var(--primary); }
+
+/* Zoomed out, an outlet with no data is only the small logo, and an outlet with a figure keeps its name. */
+[data-zoom="far"] .outlet-pin[data-empty="true"] { padding: 1px 3px 1px 6px; border-width: 1.5px; }
+[data-zoom="far"] .outlet-pin[data-empty="true"] .outlet-pin-logo { width: 22px; height: 15px; padding: 0 2px; margin: 0 0 0 -4px; }
+[data-zoom="far"] .outlet-pin[data-empty="true"]::after { display: none; }
+[data-zoom="far"] .outlet-pin[data-empty="true"] { transform: translate(-50%, -50%); }
+[data-zoom="mid"] .outlet-pin[data-empty="true"] .outlet-pin-logo { width: 28px; height: 19px; }
+
+/* Zoomed out, a pin with a figure drops its name so 44 of them stay readable. The tooltip and title still carry the name. */
+[data-zoom="far"] .outlet-pin:not([data-empty="true"]) > span { display: none; }
+[data-zoom="far"] .outlet-pin:not([data-empty="true"]) { gap: 4px; padding: 2px 7px 2px 5px; }
+[data-zoom="far"] .outlet-pin:not([data-empty="true"]) .outlet-pin-logo { width: 26px; height: 17px; }

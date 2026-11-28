@@ -13,6 +13,8 @@ export const clean = (s: unknown) =>
 export const titl = (s: unknown) => S(s).split('(')[0].trim().replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
 export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+// A positive figure is green and a negative one is red. Zero keeps the normal colour.
+export const signTone = (n: number) => (n > 0 ? 'text-success' : n < 0 ? 'text-danger' : '');
 export const RM = (n: number) => (n < 0 ? '−RM ' : 'RM ') + Math.abs(n).toLocaleString('en', { maximumFractionDigits: 0 });
 export const RM2 = (n: number) =>
   (n < 0 ? '−RM ' : 'RM ') + Math.abs(n).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

@@ -20,13 +20,19 @@ function pinIcon(p: MapPin, selected: boolean) {
   pin.dataset.hot = String(p.hot);
   pin.dataset.selected = String(selected);
   pin.dataset.empty = String(p.empty);
+  // Every outlet carries the US Pizza logo. The name and figure are only added when the outlet has data.
+  const logo = document.createElement("img");
+  logo.src = "/logo.svg";
+  logo.alt = "";
+  logo.className = "outlet-pin-logo";
+  logo.draggable = false;
+  pin.append(logo);
   if (p.empty) return L.divIcon({ className: "", iconSize: [0, 0], html: pin });
   const name = document.createElement("span");
   name.textContent = p.name;
   const figure = document.createElement("b");
   figure.textContent = p.value;
-  pin.append(name, figure);
-  return L.divIcon({ className: "", iconSize: [0, 0], html: pin });
+  pin.append(name, figure);  return L.divIcon({ className: "", iconSize: [0, 0], html: pin });
 }
 
 function tipText(text: string) {
@@ -72,6 +78,10 @@ export default function OutletMapView({
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
     const layer = L.layerGroup().addTo(map);
+    // The pins shrink when the map is zoomed out, because 44 outlets sit close together in the Klang Valley.
+    const size = () => box.setAttribute("data-zoom", map.getZoom() >= 14 ? "near" : map.getZoom() >= 12 ? "mid" : "far");
+    size();
+    map.on("zoomend", size);
     mapRef.current = map;
     layerRef.current = layer;
     return () => {
@@ -87,7 +97,8 @@ export default function OutletMapView({
     if (!layer) return;
     layer.clearLayers();
     for (const p of pins) {
-      L.marker([p.lat, p.lng], { icon: pinIcon(p, p.name === selected), title: p.title })
+      // Outlets with a figure and the chosen outlet are drawn above the plain ones, and any pin rises when pointed at.
+      L.marker([p.lat, p.lng], { icon: pinIcon(p, p.name === selected), title: p.title, riseOnHover: true, zIndexOffset: p.name === selected ? 2000 : p.empty ? 0 : 1000 })
         .on("click", () => onSelectRef.current(p.name))
         .bindTooltip(tipText(p.tip), { direction: "bottom", offset: [0, 6] })
         .addTo(layer);
